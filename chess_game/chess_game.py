@@ -1,6 +1,8 @@
 '''cog to play chess in discord'''
+import asyncio
 import io
 import os
+import pickle
 import tempfile
 from typing import Dict
 
@@ -8,20 +10,23 @@ import chess
 import chess.svg
 import discord
 from redbot.core import commands
+from redbot.core.bot import Red
 from reportlab.graphics import renderPM
 from svglib.svglib import svg2rlg
+
+SAVE_INTERVAL = 30
 
 
 class Game:
     '''class used to hold state of a game'''
 
-    def __init__(self, player_black, player_white):
+    def __init__(self, player_black_id, player_white_id):
 
         self._board = chess.Board()
         self._arrows = ()
 
-        self._player_black = player_black
-        self._player_white = player_white
+        self._player_black_id = player_black_id
+        self._player_white_id = player_white_id
 
     def get_board_text(self) -> str:
         '''returns the game board as text'''
@@ -70,14 +75,14 @@ class Game:
         return self._board.turn
 
     @property
-    def player_white(self) -> discord.Member:
+    def player_white_id(self) -> discord.Member:
         '''returns the player assigned to white pieces'''
-        return self._player_white
+        return self._player_white_id
 
     @property
-    def player_black(self) -> discord.Member:
+    def player_black_id(self) -> discord.Member:
         '''returns the player assigned to black pieces'''
-        return self._player_black
+        return self._player_black_id
 
 
 # type hints
@@ -89,11 +94,38 @@ Guilds = Dict[str, Channels]
 class Chess(commands.Cog):
     '''Cog to Play chess!'''
 
-    def __init__(self):
+    def __init__(self, bot: Red):
         super().__init__()
 
+        self._bot = bot
+        self._unsaved_state = False
+
+        self._state_file = os.path.join(
+            os.path.dirname(__file__), 'game_sessions.pickle')
+
         # dict of guilds with channels that have board games
-        self._guilds: Guilds = {}
+        self._guilds: Guilds = self._load_state()
+
+        self._task: asyncio.Task = self._bot.loop.create_task(
+            self._save_state())
+
+    def _load_state(self) -> Guilds:
+        '''Load the state file to restore all game sessions'''
+        if os.path.isfile(self._state_file):
+            with open(self._state_file, 'rb') as in_file:
+                guilds = pickle.load(in_file)
+        else:
+            guilds = {}
+        return guilds
+
+    async def _save_state(self):
+        '''Task to be called on an interval, if state is changed then save new state'''
+        while True:
+            if self._unsaved_state:
+                self._unsaved_state = False
+                with open(self._state_file, 'wb') as out_file:
+                    pickle.dump(self._guilds, out_file)
+            await asyncio.sleep(SAVE_INTERVAL)
 
     @commands.group()
     async def chess(self, ctx: commands.Context):
@@ -105,7 +137,8 @@ class Chess(commands.Cog):
         '''sub command to start a new game'''
 
         # get games from self._guild
-        channels = self._guilds[ctx.guild.id] = self._guilds.get(ctx.guild.id, {})
+        channels = self._guilds[ctx.guild.id] = self._guilds.get(
+            ctx.guild.id, {})
         games: Game
         games = channels[ctx.channel.id] = channels.get(ctx.channel.id, {})
 
@@ -125,8 +158,9 @@ class Chess(commands.Cog):
 
         game_name += suffix
 
-        game = Game(player_black, player_white)
+        game = Game(player_black.id, player_white.id)
         games[game_name] = game
+        self._unsaved_state = True
 
         embed: discord.Embed = discord.Embed()
         embed.title = "Chess"
@@ -151,7 +185,8 @@ class Chess(commands.Cog):
         embed.description = f"Chess Game List"
 
         # owner can get a list of all servers and channels when whispering
-        current_guild_channels = self._guilds.get(ctx.guild.id) if ctx.guild is not None else None
+        current_guild_channels = self._guilds.get(
+            ctx.guild.id) if ctx.guild is not None else None
         guilds: Guilds
         is_owner = await ctx.bot.is_owner(ctx.author)
         if is_owner and ctx.guild is None:
@@ -176,10 +211,13 @@ class Chess(commands.Cog):
                 count = 0
                 output = ''
                 for game_name, game in games.items():
+                    player_white = ctx.guild.get_member(game.player_white_id)
+                    player_black = ctx.guild.get_member(game.player_black_id)
+
                     count += 1
                     output += f'\n** Game: #{count}** - __{game_name}__\n' \
-                        f'```\tBlack: {game.player_black.name}\n' \
-                        f'\tWhite: {game.player_white.name}\n' \
+                        f'```\tBlack: {player_black.name}\n' \
+                        f'\tWhite: {player_white.name}\n' \
                         f'\tTotal Moves: {game.total_moves}```'
 
                 embed.add_field(
@@ -206,18 +244,22 @@ class Chess(commands.Cog):
             await ctx.send(embed=embed)
             return
 
+        player_white = ctx.guild.get_member(game.player_white_id)
+        player_black = ctx.guild.get_member(game.player_black_id)
+
         if game.turn == chess.WHITE:
             turn_color = 'White'
-            player_turn = game.player_white
-            player_next = game.player_black
+            player_turn = player_white
+            player_next = player_black
         else:
             turn_color = 'Black'
-            player_turn = game.player_black
-            player_next = game.player_white
+            player_turn = player_black
+            player_next = player_white
 
         if player_turn == ctx.author:
             # it is their turn
             game.move_piece(move)
+            self._unsaved_state = True
 
             embed.title = f"Chess"
             embed.description = f"Game: {game_name}"
@@ -242,6 +284,12 @@ class Chess(commands.Cog):
             embed.description = f"Game: {game_name}"
             embed.add_field(name=f"{ctx.author.name} - not a player",
                             value=f"{ctx.author.name} you are not part of this game!\n"
-                            f"Only {game.player_black.name} (Black) and {game.player_white.name} ' \
+                            f"Only {player_black.name} (Black) and {player_white.name} ' \
                             '(White) are able to play in this game")
             await ctx.send(embed=embed)
+
+    def __unload(self):
+        if self._task:
+            self._task.cancel()
+
+    __del__ = __unload
