@@ -80,13 +80,20 @@ class Game:
         return self._player_black
 
 
+# type hints
+Games = Dict[str, Game]
+Channels = Dict[str, Games]
+Guilds = Dict[str, Channels]
+
+
 class Chess(commands.Cog):
     '''Cog to Play chess!'''
 
     def __init__(self):
         super().__init__()
 
-        self._games: Dict[str, Game] = {}
+        # dict of guilds with channels that have board games
+        self._guilds: Guilds = {}
 
     @commands.group()
     async def chess(self, ctx: commands.Context):
@@ -96,6 +103,11 @@ class Chess(commands.Cog):
     async def start_game(self, ctx: commands.Context,
                          other_player: discord.Member, game_name: str = None):
         '''sub command to start a new game'''
+
+        # get games from self._guild
+        channels = self._guilds[ctx.guild.id] = self._guilds.get(ctx.guild.id, {})
+        games: Game
+        games = channels[ctx.channel.id] = channels.get(ctx.channel.id, {})
 
         player_black = ctx.author
         player_white = other_player
@@ -107,14 +119,14 @@ class Chess(commands.Cog):
         # make game_name unique if already exists
         count = 0
         suffix = ''
-        while game_name + suffix in self._games.keys():
+        while game_name + suffix in games.keys():
             count += 1
             suffix = f' - {count}'
 
         game_name += suffix
 
         game = Game(player_black, player_white)
-        self._games[game_name] = game
+        games[game_name] = game
 
         embed: discord.Embed = discord.Embed()
         embed.title = "Chess"
@@ -138,20 +150,41 @@ class Chess(commands.Cog):
         embed.title = f"Chess"
         embed.description = f"Chess Game List"
 
-        if self._games:
-            count = 0
-            output = ''
-            for game_name, game in self._games.items():
-                count += 1
-                output += f'\n** Game: #{count}** - __{game_name}__\n' \
-                    f'```\tBlack: {game.player_black.name}\n' \
-                    f'\tWhite: {game.player_white.name}\n' \
-                    f'\tTotal Moves: {game.total_moves}```' \
-
-            embed.add_field(name=f"List of current games:", value=output)
+        # owner can get a list of all servers and channels when whispering
+        current_guild_channels = self._guilds.get(ctx.guild.id) if ctx.guild is not None else None
+        guilds: Guilds
+        is_owner = await ctx.bot.is_owner(ctx.author)
+        if is_owner and ctx.guild is None:
+            guilds = self._guilds
         else:
+            if current_guild_channels:
+                guilds = {ctx.guild.id: current_guild_channels}
+            else:
+                guilds = None
+
+        if not guilds:
             embed.add_field(name=f"No Games Available",
                             value='You can start a new game with [p]chess start')
+            await ctx.send(embed=embed)
+            return
+
+        for guild_id, channels in guilds.items():
+            guild: discord.Guild = ctx.bot.get_guild(guild_id)
+            embed.add_field(
+                name=f'Server - {guild}', value='__List of channels:__', inline=False)
+            for channel_id, games in channels.items():
+                count = 0
+                output = ''
+                for game_name, game in games.items():
+                    count += 1
+                    output += f'\n** Game: #{count}** - __{game_name}__\n' \
+                        f'```\tBlack: {game.player_black.name}\n' \
+                        f'\tWhite: {game.player_white.name}\n' \
+                        f'\tTotal Moves: {game.total_moves}```'
+
+                embed.add_field(
+                    name=f'Channel - {guild.get_channel(channel_id)}',
+                    value='__List of games:__' + output)
 
         await ctx.send(embed=embed)
 
@@ -161,9 +194,9 @@ class Chess(commands.Cog):
 
         embed: discord.Embed = discord.Embed()
 
-        if game_name in self._games.keys():
-            game = self._games[game_name]
-        else:
+        try:
+            game = self._guilds[ctx.guild.id][ctx.channel.id][game_name]
+        except KeyError:
             # this game doesn't exist
             embed.title = f"Chess"
             embed.description = f"Game: {game_name}"
