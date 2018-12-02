@@ -1,0 +1,4 @@
+{
+    "requirements" : ["python-chess", "svglib==0.9.0b0"],
+    "tags" : ["games"]
+}
