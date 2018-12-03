@@ -231,13 +231,13 @@ class Chess(commands.Cog):
         '''move the next game piece, using Standard Algebraic Notation'''
 
         embed: discord.Embed = discord.Embed()
+        embed.title = f"Chess"
+        embed.description = f"Game: {game_name}"
 
         try:
             game = self._guilds[ctx.guild.id][ctx.channel.id][game_name]
         except KeyError:
             # this game doesn't exist
-            embed.title = f"Chess"
-            embed.description = f"Game: {game_name}"
             embed.add_field(name=f"Game does not exist",
                             value=f"This game doesn't appear to exist, please check the "
                             "game list to ensure you are entering it correctly")
@@ -258,11 +258,15 @@ class Chess(commands.Cog):
 
         if player_turn == ctx.author:
             # it is their turn
-            game.move_piece(move)
-            self._unsaved_state = True
+            try:
+                game.move_piece(move)
+            except ValueError:
+                embed.add_field(name="Invalid Move Taken!",
+                                value=f"'{move}' isn't a valid move, try again.")
+                await ctx.send(embed=embed)
+                return
 
-            embed.title = f"Chess"
-            embed.description = f"Game: {game_name}"
+            self._unsaved_state = True
 
             embed.add_field(name=f"Move: {game.total_moves} - "
                             f"{player_turn.name}'s ({turn_color}'s) Turn",
@@ -271,8 +275,6 @@ class Chess(commands.Cog):
             await self._display_board(ctx, embed, game)
         elif player_next == ctx.author:
             # not their turn yet
-            embed.title = f"Chess"
-            embed.description = f"Game: {game_name}"
             embed.add_field(name=f"{player_next.name} - not your turn",
                             value=f"{player_next.name} it doesn't look like its your turn yet! "
                             f"<@{player_turn.id}> ({turn_color}) still needs to make a move "
@@ -280,8 +282,6 @@ class Chess(commands.Cog):
             await ctx.send(embed=embed)
         else:
             # not a player
-            embed.title = f"Chess"
-            embed.description = f"Game: {game_name}"
             embed.add_field(name=f"{ctx.author.name} - not a player",
                             value=f"{ctx.author.name} you are not part of this game!\n"
                             f"Only {player_black.name} (Black) and {player_white.name} ' \
