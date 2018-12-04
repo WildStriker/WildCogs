@@ -17,6 +17,10 @@ SAVE_INTERVAL = 30
 class Game:
     '''class used to hold state of a game'''
 
+    _style = 'text {' \
+        'fill: orange' \
+        '}'
+
     def __init__(self, player_black_id, player_white_id):
 
         self._board = chess.Board()
@@ -43,7 +47,8 @@ class Game:
             board=self._board,
             lastmove=lastmove,
             check=check,
-            arrows=self._arrows).encode()
+            arrows=self._arrows,
+            style=self._style).encode()
 
         # convert to png
         image_board = cairosvg.svg2png(bytestring=svg_board)
