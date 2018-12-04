@@ -38,10 +38,13 @@ class Game:
         can't embed svg, so convert to png first
         '''
 
+        lastmove = self._board.peek() if self._board.move_stack else None
+        check = self._board.king(self.turn) if self._board.is_check() else None
+
         # write svg string to file
         svg_board = tempfile.NamedTemporaryFile(delete=False)
         svg_board.write(chess.svg.board(
-            board=self._board, arrows=self._arrows).encode())
+            board=self._board, lastmove=lastmove, check=check, arrows=self._arrows).encode())
         svg_board.close()
 
         # convert to png
