@@ -1,5 +1,5 @@
 {
     "description" : "Play chess in discord using python-chess!",
-    "requirements" : ["python-chess", "svglib==0.9.0b0"],
+    "requirements" : ["python-chess", "CairoSVG==1.0.22"],
     "tags" : ["games"]
 }

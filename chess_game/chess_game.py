@@ -1,18 +1,15 @@
 '''cog to play chess in discord'''
 import asyncio
-import io
 import os
 import pickle
-import tempfile
 from typing import Dict
 
+import cairosvg
 import chess
 import chess.svg
 import discord
 from redbot.core import commands
 from redbot.core.bot import Red
-from reportlab.graphics import renderPM
-from svglib.svglib import svg2rlg
 
 SAVE_INTERVAL = 30
 
@@ -32,7 +29,7 @@ class Game:
         '''returns the game board as text'''
         return str(self._board)
 
-    def get_board_image(self) -> io.BytesIO:
+    def get_board_image(self) -> bytes:
         '''returns the game as an image
 
         can't embed svg, so convert to png first
@@ -41,25 +38,15 @@ class Game:
         lastmove = self._board.peek() if self._board.move_stack else None
         check = self._board.king(self.turn) if self._board.is_check() else None
 
-        # write svg string to file
-        svg_board = tempfile.NamedTemporaryFile(delete=False)
-        svg_board.write(chess.svg.board(
-            board=self._board, lastmove=lastmove, check=check, arrows=self._arrows).encode())
-        svg_board.close()
+        # get svg string
+        svg_board = chess.svg.board(
+            board=self._board,
+            lastmove=lastmove,
+            check=check,
+            arrows=self._arrows).encode()
 
         # convert to png
-        drawing = svg2rlg(svg_board.name)
-        png_board = tempfile.NamedTemporaryFile(delete=False)
-        png_board.close()
-        renderPM.drawToFile(drawing, png_board.name, fmt='PNG')
-
-        # read to memory
-        image_board: io.BytesIO = open(png_board.name, "rb").read()
-
-        # remove tempfiles
-        os.remove(svg_board.name)
-        os.remove(png_board.name)
-
+        image_board = cairosvg.svg2png(bytestring=svg_board)
         return image_board
 
     def move_piece(self, move):
