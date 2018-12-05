@@ -109,6 +109,21 @@ class Game:
         '''true if draw by fivefold repetition'''
         return self._board.is_fivefold_repetition()
 
+    @property
+    def can_claim_draw(self):
+        '''true if players can claim a draw'''
+        return self._board.can_claim_draw()
+
+    @property
+    def can_claim_fifty_moves(self):
+        '''true if players can claim a draw by fifty moves'''
+        return self._board.can_claim_fifty_moves()
+
+    @property
+    def can_claim_threefold_repetition(self):
+        '''true if players can claim a draw by threefold repetition'''
+        return self._board.can_claim_threefold_repetition()
+
 
 # type hints
 Games = Dict[str, Game]
@@ -118,6 +133,9 @@ Guilds = Dict[str, Channels]
 
 class Chess(commands.Cog):
     '''Cog to Play chess!'''
+
+    _fifty_moves = 'Fifty moves'
+    _threefold_repetition = 'Threefold repetition'
 
     def __init__(self, bot: Red):
         super().__init__()
@@ -316,7 +334,7 @@ class Chess(commands.Cog):
             elif game.is_fivefold_repetition:
                 is_game_over = True
                 value_move = "Draw by fivefold repetition!" \
-                "Position has occured five times"
+                    "Position has occured five times"
             else:
                 value_move = f"<@{player_next.id}> you're up next!"
 
@@ -328,6 +346,25 @@ class Chess(commands.Cog):
 
             embed.add_field(name=name_move,
                             value=value_move)
+
+            # show if can claim draw
+            if game.can_claim_draw:
+
+                if game.can_claim_fifty_moves:
+                    fifty_moves = f'\n"{self._fifty_moves }"'
+                else:
+                    fifty_moves = ''
+
+                if game.can_claim_threefold_repetition:
+                    threefold_repetition = f'\n"{self._threefold_repetition}"'
+                else:
+                    threefold_repetition = ''
+
+                embed.add_field(
+                    name='Draw can be claimed',
+                    value='To end this game now use "[p]chess claimdraw" with:' +
+                    fifty_moves +
+                    threefold_repetition)
 
             self._unsaved_state = True
 
@@ -347,8 +384,42 @@ class Chess(commands.Cog):
                             '(White) are able to play in this game")
             await ctx.send(embed=embed)
 
+    @chess.group(name='claimdraw', autohelp=False)
+    async def claim_draw(self, ctx: commands.Context, game_name: str, claim_type: str):
+        '''if valid claim made to draw the game will end with no victor'''
+
+        game = self._guilds[ctx.guild.id][ctx.channel.id][game_name]
+
+        embed: discord.Embed = discord.Embed()
+
+        embed.title = "Chess"
+        embed.description = "Claim Draw"
+
+        if self._fifty_moves == claim_type and game.can_claim_fifty_moves:
+            embed.add_field(
+                name=f'Draw! - {claim_type}',
+                value='There are been no captures or pawns moved in the last 50 moves'
+            )
+            self._remove_game(ctx.guild.id, ctx.channel.id, game_name)
+        elif self._threefold_repetition == claim_type and game.can_claim_threefold_repetition:
+            embed.add_field(
+                name=f'Draw! - {claim_type}',
+                value='Position has occured five times'
+            )
+            self._remove_game(ctx.guild.id, ctx.channel.id, game_name)
+        else:
+            embed.add_field(
+                name=claim_type,
+                value=f'Unable to claim {claim_type}\n'
+                f'{claim_type} is not a valid reason, the game is not drawn.'
+            )
+
+        await ctx.send(embed=embed)
+
     def _remove_game(self, guild_id: str, channel_id: str, game_name: str):
         '''clean up, remove the game and channel / guild if no games / channels remains'''
+        self._unsaved_state = True
+
         del self._guilds[guild_id][channel_id][game_name]
 
         if not self._guilds[guild_id][channel_id]:
