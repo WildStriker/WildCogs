@@ -206,8 +206,8 @@ class Chess(commands.Cog):
         '''list all available games'''
         embed: discord.Embed = discord.Embed()
 
-        embed.title = f"Chess"
-        embed.description = f"Chess Game List"
+        embed.title = "Chess"
+        embed.description = "Chess Game List"
 
         # owner can get a list of all servers and channels when whispering
         current_guild_channels = self._guilds.get(
@@ -223,7 +223,7 @@ class Chess(commands.Cog):
                 guilds = None
 
         if not guilds:
-            embed.add_field(name=f"No Games Available",
+            embed.add_field(name="No Games Available",
                             value='You can start a new game with [p]chess start')
             await ctx.send(embed=embed)
             return
@@ -256,15 +256,15 @@ class Chess(commands.Cog):
         '''move the next game piece, using Standard Algebraic Notation'''
 
         embed: discord.Embed = discord.Embed()
-        embed.title = f"Chess"
+        embed.title = "Chess"
         embed.description = f"Game: {game_name}"
 
         try:
             game = self._guilds[ctx.guild.id][ctx.channel.id][game_name]
         except KeyError:
             # this game doesn't exist
-            embed.add_field(name=f"Game does not exist",
-                            value=f"This game doesn't appear to exist, please check the "
+            embed.add_field(name="Game does not exist",
+                            value="This game doesn't appear to exist, please check the "
                             "game list to ensure you are entering it correctly")
             await ctx.send(embed=embed)
             return
@@ -311,11 +311,11 @@ class Chess(commands.Cog):
                     "Neither player has enough pieces to win"
             elif game.is_seventyfive_moves:
                 is_game_over = True
-                value_move = f"Draw by seventyfive moves rule!" \
+                value_move = "Draw by seventyfive moves rule!" \
                     "There are been no captures or pawns moved in the last 75 moves"
             elif game.is_fivefold_repetition:
                 is_game_over = True
-                value_move = f"Draw by fivefold repetition!" \
+                value_move = "Draw by fivefold repetition!" \
                 "Position has occured five times"
             else:
                 value_move = f"<@{player_next.id}> you're up next!"
