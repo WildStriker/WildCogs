@@ -89,6 +89,26 @@ class Game:
         '''true if in checkmate'''
         return self._board.is_checkmate()
 
+    @property
+    def is_stalemate(self) -> bool:
+        '''true if draw by statemate'''
+        return self._board.is_stalemate()
+
+    @property
+    def is_insufficient_material(self) -> bool:
+        '''true if draw by insufficient material'''
+        return self._board.is_insufficient_material()
+
+    @property
+    def is_seventyfive_moves(self) -> bool:
+        '''true if draw by seventyfive moves'''
+        return self._board.is_seventyfive_moves()
+
+    @property
+    def is_fivefold_repetition(self) -> bool:
+        '''true if draw by fivefold repetition'''
+        return self._board.is_fivefold_repetition()
+
 
 # type hints
 Games = Dict[str, Game]
@@ -281,6 +301,22 @@ class Chess(commands.Cog):
             elif game.is_check:
                 is_game_over = True
                 value_move = f"<@{player_next.id}> you are in check. Your move is next."
+            elif game.is_stalemate:
+                is_game_over = True
+                value_move = "Draw by stalemate!\n" \
+                    f"<@{player_next.id}> is not in check and can only move into check! !"
+            elif game.is_insufficient_material:
+                is_game_over = True
+                value_move = "Draw by insufficient material!\n" \
+                    "Neither player has enough pieces to win"
+            elif game.is_seventyfive_moves:
+                is_game_over = True
+                value_move = f"Draw by seventyfive moves rule!" \
+                    "There are been no captures or pawns moved in the last 75 moves"
+            elif game.is_fivefold_repetition:
+                is_game_over = True
+                value_move = f"Draw by fivefold repetition!" \
+                "Position has occured five times"
             else:
                 value_move = f"<@{player_next.id}> you're up next!"
 
