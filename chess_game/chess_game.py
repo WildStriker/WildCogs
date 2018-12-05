@@ -79,6 +79,16 @@ class Game:
         '''returns the player assigned to black pieces'''
         return self._player_black_id
 
+    @property
+    def is_check(self) -> bool:
+        '''true if in check'''
+        return self._board.is_check()
+
+    @property
+    def is_checkmate(self) -> bool:
+        '''true if in checkmate'''
+        return self._board.is_checkmate()
+
 
 # type hints
 Games = Dict[str, Game]
@@ -261,11 +271,29 @@ class Chess(commands.Cog):
                 await ctx.send(embed=embed)
                 return
 
-            self._unsaved_state = True
+            name_move = f"Move: {game.total_moves} - " \
+                f"{player_turn.name}'s ({turn_color}'s) Turn"
 
-            embed.add_field(name=f"Move: {game.total_moves} - "
-                            f"{player_turn.name}'s ({turn_color}'s) Turn",
-                            value=f"<@{player_next.id}> you're up next!")
+            is_game_over = False
+            if game.is_checkmate:
+                is_game_over = True
+                value_move = f"Checkmate! <@{ctx.author.id}> Wins!"
+            elif game.is_check:
+                is_game_over = True
+                value_move = f"<@{player_next.id}> you are in check. Your move is next."
+            else:
+                value_move = f"<@{player_next.id}> you're up next!"
+
+            if is_game_over:
+                self._remove_game(ctx.guild.id, ctx.channel.id, game_name)
+                embed.add_field(
+                    name="Game Over!",
+                    value="Match is over! Start a new game if you want to play again.")
+
+            embed.add_field(name=name_move,
+                            value=value_move)
+
+            self._unsaved_state = True
 
             await self._display_board(ctx, embed, game)
         elif player_next == ctx.author:
@@ -282,6 +310,18 @@ class Chess(commands.Cog):
                             f"Only {player_black.name} (Black) and {player_white.name} ' \
                             '(White) are able to play in this game")
             await ctx.send(embed=embed)
+
+    def _remove_game(self, guild_id: str, channel_id: str, game_name: str):
+        '''clean up, remove the game and channel / guild if no games / channels remains'''
+        del self._guilds[guild_id][channel_id][game_name]
+
+        if not self._guilds[guild_id][channel_id]:
+            del self._guilds[guild_id][channel_id]
+        else:
+            return
+
+        if not self._guilds[guild_id]:
+            del self._guilds[guild_id]
 
     def __unload(self):
         if self._task:
