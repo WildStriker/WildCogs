@@ -363,4 +363,7 @@ class Chess(commands.Cog):
         if self._task:
             self._task.cancel()
 
+        # call once more before unloading
+        self._save_state()
+
     __del__ = __unload
