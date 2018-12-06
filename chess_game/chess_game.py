@@ -174,7 +174,7 @@ class Chess(commands.Cog):
     async def chess(self, ctx: commands.Context):
         '''manage chess games'''
 
-    @chess.group(name='start', autohelp=False)
+    @chess.command(name='start', autohelp=False)
     async def start_game(self, ctx: commands.Context,
                          other_player: discord.Member, game_name: str = None):
         '''sub command to start a new game'''
@@ -219,7 +219,7 @@ class Chess(commands.Cog):
         embed.set_image(url="attachment://board.png")
         await ctx.send(embed=embed, file=discord.File(board_image, 'board.png'))
 
-    @chess.group(name='list', autohelp=False)
+    @chess.command(name='list', autohelp=False)
     async def list_games(self, ctx: commands.Context):
         '''list all available games'''
         embed: discord.Embed = discord.Embed()
@@ -269,7 +269,7 @@ class Chess(commands.Cog):
 
         await ctx.send(embed=embed)
 
-    @chess.group(name='move', autohelp=False)
+    @chess.command(name='move', autohelp=False)
     async def move_piece(self, ctx: commands.Context, game_name: str, move: str):
         '''move the next game piece, using Standard Algebraic Notation'''
 
@@ -362,7 +362,7 @@ class Chess(commands.Cog):
 
                 embed.add_field(
                     name='Draw can be claimed',
-                    value='To end this game now use "[p]chess claimdraw" with:' +
+                    value='To end this game now use "[p]chess draw claim" with:' +
                     fifty_moves +
                     threefold_repetition)
 
@@ -384,7 +384,7 @@ class Chess(commands.Cog):
                             '(White) are able to play in this game")
             await ctx.send(embed=embed)
 
-    @chess.group(name='claimdraw', autohelp=False)
+    @chess.command(name='claimdraw', autohelp=False)
     async def claim_draw(self, ctx: commands.Context, game_name: str, claim_type: str):
         '''if valid claim made to draw the game will end with no victor'''
 
