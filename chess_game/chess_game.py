@@ -161,7 +161,7 @@ class Chess(commands.Cog):
         self._guilds: Guilds = self._load_state()
 
         self._task: asyncio.Task = self._bot.loop.create_task(
-            self._save_state())
+            self._save_state_loop())
 
     def _load_state(self) -> Guilds:
         '''Load the state file to restore all game sessions'''
@@ -172,14 +172,18 @@ class Chess(commands.Cog):
             guilds = {}
         return guilds
 
-    async def _save_state(self):
+    async def _save_state_loop(self):
         '''Task to be called on an interval, if state is changed then save new state'''
         while True:
-            if self._unsaved_state:
-                self._unsaved_state = False
-                with open(self._state_file, 'wb') as out_file:
-                    pickle.dump(self._guilds, out_file)
+            self._save_state()
             await asyncio.sleep(SAVE_INTERVAL)
+
+    def _save_state(self):
+        '''save state of all on going games'''
+        if self._unsaved_state:
+            self._unsaved_state = False
+            with open(self._state_file, 'wb') as out_file:
+                pickle.dump(self._guilds, out_file)
 
     @commands.group()
     async def chess(self, ctx: commands.Context):
