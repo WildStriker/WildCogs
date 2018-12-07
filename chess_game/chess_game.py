@@ -237,10 +237,15 @@ class Chess(commands.Cog):
     @chess.command(name='list', autohelp=False)
     async def list_games(self, ctx: commands.Context):
         '''list all available games'''
+
+        max_len = 1000
+
         embed: discord.Embed = discord.Embed()
 
         embed.title = "Chess"
         embed.description = "Chess Game List"
+
+        total_len = len(embed.title) + len(embed.description)
 
         # owner can get a list of all servers and channels when whispering
         current_guild_channels = self._guilds.get(
@@ -263,8 +268,13 @@ class Chess(commands.Cog):
 
         for guild_id, channels in guilds.items():
             guild: discord.Guild = ctx.bot.get_guild(guild_id)
+            server_name = f'Server - {guild}'
+            server_value = '__List of channels:__'
+            total_len += len(server_name) + len(server_value)
             embed.add_field(
-                name=f'Server - {guild}', value='__List of channels:__', inline=False)
+                name=server_name,
+                value=server_value,
+                inline=False)
             for channel_id, games in channels.items():
                 count = 0
                 output = ''
@@ -273,16 +283,37 @@ class Chess(commands.Cog):
                     player_black = ctx.guild.get_member(game.player_black_id)
 
                     count += 1
-                    output += f'\n** Game: #{count}** - __{game_name}__\n' \
+                    current_game = f'\n** Game: #{count}** - __{game_name}__\n' \
                         f'```\tBlack: {player_black.name}\n' \
                         f'\tWhite: {player_white.name}\n' \
                         f'\tTotal Moves: {game.total_moves}```'
 
+                    current_game_len = len(current_game)
+
+                    # send it now if we hit our limit
+                    if total_len + current_game_len > max_len:
+                        embed.add_field(
+                            name=f'Channel - {guild.get_channel(channel_id)}',
+                            value='__List of games:__' + output)
+                        output = current_game
+                        total_len = current_game_len
+
+                        await ctx.send(embed=embed)
+                        embed: discord.Embed = discord.Embed()
+
+                        embed.title = "Chess"
+                        embed.description = "Chess Game List - Continued"
+                    else:
+                        output += current_game
+                        total_len += current_game_len
+
+                # add field for remaining
                 embed.add_field(
                     name=f'Channel - {guild.get_channel(channel_id)}',
                     value='__List of games:__' + output)
 
-        await ctx.send(embed=embed)
+        if total_len > 0:
+            await ctx.send(embed=embed)
 
     @chess.command(name='move', autohelp=False)
     async def move_piece(self, ctx: commands.Context, game_name: str, move: str):
