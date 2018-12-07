@@ -28,6 +28,7 @@ class Game:
 
         self._player_black_id = player_black_id
         self._player_white_id = player_white_id
+        self._draw_offer_by = None
 
     def get_board_text(self) -> str:
         '''returns the game board as text'''
@@ -70,14 +71,24 @@ class Game:
         return self._board.turn
 
     @property
-    def player_white_id(self) -> discord.Member:
+    def player_white_id(self) -> str:
         '''returns the player assigned to white pieces'''
         return self._player_white_id
 
     @property
-    def player_black_id(self) -> discord.Member:
+    def player_black_id(self) -> str:
         '''returns the player assigned to black pieces'''
         return self._player_black_id
+
+    @property
+    def draw_offer_by(self) -> str:
+        '''returns the id of the player who offered draw'''
+        return self._draw_offer_by
+
+    @draw_offer_by.setter
+    def draw_offer_by(self, player_id: str):
+        '''sets the id of the player who offered draw'''
+        self._draw_offer_by = player_id
 
     @property
     def is_check(self) -> bool:
@@ -384,7 +395,11 @@ class Chess(commands.Cog):
                             '(White) are able to play in this game")
             await ctx.send(embed=embed)
 
-    @chess.command(name='claimdraw', autohelp=False)
+    @chess.group(name='draw')
+    async def draw(self, ctx: commands.Context):
+        '''draw related commands'''
+
+    @draw.command(name='claim', autohelp=False)
     async def claim_draw(self, ctx: commands.Context, game_name: str, claim_type: str):
         '''if valid claim made to draw the game will end with no victor'''
 
@@ -412,6 +427,126 @@ class Chess(commands.Cog):
                 name=claim_type,
                 value=f'Unable to claim {claim_type}\n'
                 f'{claim_type} is not a valid reason, the game is not drawn.'
+            )
+
+        await ctx.send(embed=embed)
+
+    @draw.group(name='byagreement')
+    async def by_agreement(self, ctx: commands.Context):
+        '''end game by draw if both players agree'''
+
+    @by_agreement.command(name='offer', autohelp=False)
+    async def offer_draw(self, ctx: commands.Context, game_name: str):
+        '''Offer draw by agreement'''
+
+        game = self._guilds[ctx.guild.id][ctx.channel.id][game_name]
+
+        embed: discord.Embed = discord.Embed()
+
+        embed.title = "Chess"
+        embed.description = "Offer Draw"
+
+        # identify the other player to mention
+        if ctx.author.id == game.player_black_id:
+            other_player = game.player_white_id
+        elif ctx.author.id == game.player_white_id:
+            other_player = game.player_black_id
+        else:  # not part of this game
+            embed.add_field(
+                name="You are not part of this game",
+                value="You are not able to offer a draw if you are not one of the players.")
+            await ctx.send(embed=embed)
+            return
+
+        if game.draw_offer_by:
+            if game.draw_offer_by == ctx.author.id:
+                embed.add_field(
+                    name="Offer Already Given",
+                    value="You have already offered a draw, wait for the other players response")
+            else:
+                embed.add_field(
+                    name="You Must Accept Offer",
+                    value="The other player has offered a draw, "
+                    "please respond with the accept subcommand instead.")
+        else:
+            game.draw_offer_by = ctx.author.id
+            embed.add_field(
+                name=f"{ctx.author.name} has offered a draw",
+                value=f"<@{other_player}> please response back with "
+                "the accept or decline subcommand")
+        await ctx.send(embed=embed)
+
+    @by_agreement.command(name='accept', autohelp=False)
+    async def accept_draw(self, ctx: commands.Context, game_name: str):
+        '''Accept draw by agreement if the other player offered'''
+        game = self._guilds[ctx.guild.id][ctx.channel.id][game_name]
+
+        embed: discord.Embed = discord.Embed()
+
+        embed.title = "Chess"
+        embed.description = "Accept Draw"
+
+        # identify the player that offered draw
+        if ctx.author.id == game.player_black_id:
+            other_player = game.player_white_id
+        elif ctx.author.id == game.player_white_id:
+            other_player = game.player_black_id
+        else:  # not part of this game
+            embed.add_field(
+                name="You are not part of this game",
+                value="You are not able to accept a draw if you are not one of the players.")
+            await ctx.send(embed=embed)
+            return
+
+        if game.draw_offer_by:
+            if other_player == game.draw_offer_by:
+                embed.add_field(
+                    name=f'{ctx.author.name} Accepts',
+                    value='Game has ended in a draw by agreement!')
+
+                self._remove_game(ctx.guild.id, ctx.channel.id, game_name)
+            else:
+                embed.add_field(
+                    name='Cannot Accept',
+                    value=f'You can not accept if you are the one that has offered the draw'
+                )
+        else:
+            embed.add_field(
+                name='No Draw Offer',
+                value='No one has offered draw by agreement'
+            )
+
+        await ctx.send(embed=embed)
+
+    @by_agreement.command(name='decline', autohelp=False)
+    async def decline_draw(self, ctx: commands.Context, game_name: str):
+        '''Decline draw by agreement.  Can be done by either player'''
+        game = self._guilds[ctx.guild.id][ctx.channel.id][game_name]
+
+        embed: discord.Embed = discord.Embed()
+
+        embed.title = "Chess"
+        embed.description = "Decline Draw"
+
+        # can't decline if they aren't in the game
+        if ctx.author.id != game.player_black_id and ctx.author.id == game.player_white_id:
+            embed.add_field(
+                name="You are not part of this game",
+                value="You are not able to decline a draw if you are not one of the players.")
+            await ctx.send(embed=embed)
+            return
+
+        if game.draw_offer_by:
+            embed.add_field(
+                name=f'{ctx.author.name} Declined',
+                value='Draw by agreement has been decline, the game continues!')
+
+            self._unsaved_state = True
+            game.draw_offer_by = None
+        else:
+            embed.add_field(
+                name='No Draw Offer',
+                value='No one has offered draw by agreement'
             )
 
         await ctx.send(embed=embed)
