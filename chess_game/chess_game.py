@@ -363,7 +363,6 @@ class Chess(commands.Cog):
                 is_game_over = True
                 value_move = f"Checkmate! <@{ctx.author.id}> Wins!"
             elif game.is_check:
-                is_game_over = True
                 value_move = f"<@{player_next.id}> you are in check. Your move is next."
             elif game.is_stalemate:
                 is_game_over = True
