@@ -279,8 +279,8 @@ class Chess(commands.Cog):
                 count = 0
                 output = ''
                 for game_name, game in games.items():
-                    player_white = ctx.guild.get_member(game.player_white_id)
-                    player_black = ctx.guild.get_member(game.player_black_id)
+                    player_white = guild.get_member(game.player_white_id)
+                    player_black = guild.get_member(game.player_black_id)
 
                     count += 1
                     current_game = f'\n** Game: #{count}** - __{game_name}__\n' \
