@@ -1,17 +1,12 @@
 '''cog to play chess in discord'''
-import asyncio
-import os
-import pickle
 from typing import Dict
 
 import cairosvg
 import chess
 import chess.svg
 import discord
-from redbot.core import commands
-from redbot.core.bot import Red
-
-SAVE_INTERVAL = 30
+import jsonpickle
+from redbot.core import Config, commands
 
 
 class Game:
@@ -138,8 +133,6 @@ class Game:
 
 # type hints
 Games = Dict[str, Game]
-Channels = Dict[str, Games]
-Guilds = Dict[str, Channels]
 
 
 class Chess(commands.Cog):
@@ -148,42 +141,23 @@ class Chess(commands.Cog):
     _fifty_moves = 'Fifty moves'
     _threefold_repetition = 'Threefold repetition'
 
-    def __init__(self, bot: Red):
+    def __init__(self):
         super().__init__()
 
-        self._bot = bot
-        self._unsaved_state = False
+        self._config = Config.get_conf(
+            self, identifier=51314929031968350236701571200827144869558993811)
 
-        self._state_file = os.path.join(
-            os.path.dirname(__file__), 'game_sessions.pickle')
-
-        # dict of guilds with channels that have board games
-        self._guilds: Guilds = self._load_state()
-
-        self._task: asyncio.Task = self._bot.loop.create_task(
-            self._save_state_loop())
-
-    def _load_state(self) -> Guilds:
-        '''Load the state file to restore all game sessions'''
-        if os.path.isfile(self._state_file):
-            with open(self._state_file, 'rb') as in_file:
-                guilds = pickle.load(in_file)
+    async def _get_games(self, channel) -> Games:
+        games_json = await self._config.channel(channel).games()
+        if games_json:
+            games = jsonpickle.decode(games_json)
+            return games
         else:
-            guilds = {}
-        return guilds
+            return None
 
-    async def _save_state_loop(self):
-        '''Task to be called on an interval, if state is changed then save new state'''
-        while True:
-            self._save_state()
-            await asyncio.sleep(SAVE_INTERVAL)
-
-    def _save_state(self):
-        '''save state of all on going games'''
-        if self._unsaved_state:
-            self._unsaved_state = False
-            with open(self._state_file, 'wb') as out_file:
-                pickle.dump(self._guilds, out_file)
+    async def _set_games(self, channel, games):
+        games_json = jsonpickle.encode(games)
+        await self._config.channel(channel).games.set(games_json)
 
     @commands.group()
     async def chess(self, ctx: commands.Context):
@@ -194,11 +168,10 @@ class Chess(commands.Cog):
                          other_player: discord.Member, game_name: str = None):
         '''sub command to start a new game'''
 
-        # get games from self._guild
-        channels = self._guilds[ctx.guild.id] = self._guilds.get(
-            ctx.guild.id, {})
-        games: Game
-        games = channels[ctx.channel.id] = channels.get(ctx.channel.id, {})
+        # get games config
+        games = await self._get_games(ctx.channel)
+        if not games:
+            games = {}
 
         player_black = ctx.author
         player_white = other_player
@@ -218,7 +191,8 @@ class Chess(commands.Cog):
 
         game = Game(player_black.id, player_white.id)
         games[game_name] = game
-        self._unsaved_state = True
+
+        await self._set_games(ctx.channel, games)
 
         embed: discord.Embed = discord.Embed()
         embed.title = "Chess"
@@ -237,6 +211,7 @@ class Chess(commands.Cog):
     @chess.command(name='list', autohelp=False)
     async def list_games(self, ctx: commands.Context):
         '''list all available games'''
+        no_games = True
 
         max_len = 1000
 
@@ -247,72 +222,54 @@ class Chess(commands.Cog):
 
         total_len = len(embed.title) + len(embed.description)
 
-        # owner can get a list of all servers and channels when whispering
-        current_guild_channels = self._guilds.get(
-            ctx.guild.id) if ctx.guild is not None else None
-        guilds: Guilds
-        is_owner = await ctx.bot.is_owner(ctx.author)
-        if is_owner and ctx.guild is None:
-            guilds = self._guilds
-        else:
-            if current_guild_channels:
-                guilds = {ctx.guild.id: current_guild_channels}
-            else:
-                guilds = None
+        for channel in ctx.guild.channels:
+            games = await self._get_games(channel)
+            count = 0
+            output = ''
 
-        if not guilds:
+            if not games:
+                continue
+            no_games = False
+
+            for game_name, game in games.items():
+                player_white = ctx.guild.get_member(game.player_white_id)
+                player_black = ctx.guild.get_member(game.player_black_id)
+
+                count += 1
+                current_game = f'\n** Game: #{count}** - __{game_name}__\n' \
+                    f'```\tBlack: {player_black.name}\n' \
+                    f'\tWhite: {player_white.name}\n' \
+                    f'\tTotal Moves: {game.total_moves}```'
+
+                current_game_len = len(current_game)
+
+                # send it now if we hit our limit
+                if total_len + current_game_len > max_len:
+                    embed.add_field(
+                        name=f'Channel - {channel}',
+                        value='__List of games:__' + output)
+                    output = current_game
+                    total_len = current_game_len
+
+                    await ctx.send(embed=embed)
+                    embed: discord.Embed = discord.Embed()
+
+                    embed.title = "Chess"
+                    embed.description = "Chess Game List - Continued"
+                else:
+                    output += current_game
+                    total_len += current_game_len
+
+            # add field for remaining
+            embed.add_field(
+                name=f'Channel - {channel}',
+                value='__List of games:__' + output)
+
+        if no_games:
             embed.add_field(name="No Games Available",
                             value='You can start a new game with [p]chess start')
             await ctx.send(embed=embed)
-            return
-
-        for guild_id, channels in guilds.items():
-            guild: discord.Guild = ctx.bot.get_guild(guild_id)
-            server_name = f'Server - {guild}'
-            server_value = '__List of channels:__'
-            total_len += len(server_name) + len(server_value)
-            embed.add_field(
-                name=server_name,
-                value=server_value,
-                inline=False)
-            for channel_id, games in channels.items():
-                count = 0
-                output = ''
-                for game_name, game in games.items():
-                    player_white = guild.get_member(game.player_white_id)
-                    player_black = guild.get_member(game.player_black_id)
-
-                    count += 1
-                    current_game = f'\n** Game: #{count}** - __{game_name}__\n' \
-                        f'```\tBlack: {player_black.name}\n' \
-                        f'\tWhite: {player_white.name}\n' \
-                        f'\tTotal Moves: {game.total_moves}```'
-
-                    current_game_len = len(current_game)
-
-                    # send it now if we hit our limit
-                    if total_len + current_game_len > max_len:
-                        embed.add_field(
-                            name=f'Channel - {guild.get_channel(channel_id)}',
-                            value='__List of games:__' + output)
-                        output = current_game
-                        total_len = current_game_len
-
-                        await ctx.send(embed=embed)
-                        embed: discord.Embed = discord.Embed()
-
-                        embed.title = "Chess"
-                        embed.description = "Chess Game List - Continued"
-                    else:
-                        output += current_game
-                        total_len += current_game_len
-
-                # add field for remaining
-                embed.add_field(
-                    name=f'Channel - {guild.get_channel(channel_id)}',
-                    value='__List of games:__' + output)
-
-        if total_len > 0:
+        elif total_len > 0:
             await ctx.send(embed=embed)
 
     @chess.command(name='move', autohelp=False)
@@ -324,7 +281,8 @@ class Chess(commands.Cog):
         embed.description = f"Game: {game_name}"
 
         try:
-            game = self._guilds[ctx.guild.id][ctx.channel.id][game_name]
+            games = await self._get_games(ctx.channel)
+            game = games[game_name]
         except KeyError:
             # this game doesn't exist
             embed.add_field(name="Game does not exist",
@@ -384,7 +342,7 @@ class Chess(commands.Cog):
                 value_move = f"<@{player_next.id}> you're up next!"
 
             if is_game_over:
-                self._remove_game(ctx.guild.id, ctx.channel.id, game_name)
+                del games[game_name]
                 embed.add_field(
                     name="Game Over!",
                     value="Match is over! Start a new game if you want to play again.")
@@ -411,7 +369,7 @@ class Chess(commands.Cog):
                     fifty_moves +
                     threefold_repetition)
 
-            self._unsaved_state = True
+            await self._set_games(ctx.channel, games)
 
             await self._display_board(ctx, embed, game)
         elif player_next == ctx.author:
@@ -437,7 +395,8 @@ class Chess(commands.Cog):
     async def claim_draw(self, ctx: commands.Context, game_name: str, claim_type: str):
         '''if valid claim made to draw the game will end with no victor'''
 
-        game = self._guilds[ctx.guild.id][ctx.channel.id][game_name]
+        games = await self._get_games(ctx.channel)
+        game = games[game_name]
 
         embed: discord.Embed = discord.Embed()
 
@@ -449,13 +408,15 @@ class Chess(commands.Cog):
                 name=f'Draw! - {claim_type}',
                 value='There are been no captures or pawns moved in the last 50 moves'
             )
-            self._remove_game(ctx.guild.id, ctx.channel.id, game_name)
+            del games[game_name]
+            await self._set_games(ctx.channel, games)
         elif self._threefold_repetition == claim_type and game.can_claim_threefold_repetition:
             embed.add_field(
                 name=f'Draw! - {claim_type}',
                 value='Position has occured five times'
             )
-            self._remove_game(ctx.guild.id, ctx.channel.id, game_name)
+            del games[game_name]
+            await self._set_games(ctx.channel, games)
         else:
             embed.add_field(
                 name=claim_type,
@@ -473,7 +434,8 @@ class Chess(commands.Cog):
     async def offer_draw(self, ctx: commands.Context, game_name: str):
         '''Offer draw by agreement'''
 
-        game = self._guilds[ctx.guild.id][ctx.channel.id][game_name]
+        games = await self._get_games(ctx.channel)
+        game = games[game_name]
 
         embed: discord.Embed = discord.Embed()
 
@@ -508,12 +470,14 @@ class Chess(commands.Cog):
                 name=f"{ctx.author.name} has offered a draw",
                 value=f"<@{other_player}> please response back with "
                 "the accept or decline subcommand")
+            await self._set_games(ctx.channel, games)
         await ctx.send(embed=embed)
 
     @by_agreement.command(name='accept', autohelp=False)
     async def accept_draw(self, ctx: commands.Context, game_name: str):
         '''Accept draw by agreement if the other player offered'''
-        game = self._guilds[ctx.guild.id][ctx.channel.id][game_name]
+        games = await self._get_games(ctx.channel)
+        game = games[game_name]
 
         embed: discord.Embed = discord.Embed()
 
@@ -538,7 +502,8 @@ class Chess(commands.Cog):
                     name=f'{ctx.author.name} Accepts',
                     value='Game has ended in a draw by agreement!')
 
-                self._remove_game(ctx.guild.id, ctx.channel.id, game_name)
+                del games[game_name]
+                await self._set_games(ctx.channel, games)
             else:
                 embed.add_field(
                     name='Cannot Accept',
@@ -555,7 +520,8 @@ class Chess(commands.Cog):
     @by_agreement.command(name='decline', autohelp=False)
     async def decline_draw(self, ctx: commands.Context, game_name: str):
         '''Decline draw by agreement.  Can be done by either player'''
-        game = self._guilds[ctx.guild.id][ctx.channel.id][game_name]
+        games = await self._get_games(ctx.channel)
+        game = games[game_name]
 
         embed: discord.Embed = discord.Embed()
 
@@ -575,8 +541,8 @@ class Chess(commands.Cog):
                 name=f'{ctx.author.name} Declined',
                 value='Draw by agreement has been decline, the game continues!')
 
-            self._unsaved_state = True
             game.draw_offer_by = None
+            await self._set_games(ctx.channel, games)
         else:
             embed.add_field(
                 name='No Draw Offer',
@@ -584,26 +550,3 @@ class Chess(commands.Cog):
             )
 
         await ctx.send(embed=embed)
-
-    def _remove_game(self, guild_id: str, channel_id: str, game_name: str):
-        '''clean up, remove the game and channel / guild if no games / channels remains'''
-        self._unsaved_state = True
-
-        del self._guilds[guild_id][channel_id][game_name]
-
-        if not self._guilds[guild_id][channel_id]:
-            del self._guilds[guild_id][channel_id]
-        else:
-            return
-
-        if not self._guilds[guild_id]:
-            del self._guilds[guild_id]
-
-    def __unload(self):
-        if self._task:
-            self._task.cancel()
-
-        # call once more before unloading
-        self._save_state()
-
-    __del__ = __unload
