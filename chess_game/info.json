@@ -1,4 +1,8 @@
 {
+    "author" : ["WildStriker (WildStriker#6222)"],
+    "install_msg" : "Thank you for installing this cog!\n\nPlease note that `cairo` is required to be installed in order to display the game in discord.  \n\n<https://www.cairographics.org/download/>\n\n**Linux\\Mac:**\n    See instructions in the link above\n\n**Windows:**  \n    As recommended by the above link easiest way to get started is by installing the `GTK+ runtime environment` as it comes packaged with `cairo`\n\n    be sure to install the correct 32\\64 bit installation depending on if you are using 32 or 64 bit version of python.\n\n    32 bit:  \n    <https://gtk-win.sourceforge.io/home/index.php/Main/Downloads>\n\n    64 bit:  \n    <https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer/releases>\n\n    Already have GIMP installed? then there is no need to install GTK+ runtime you just need to add GIMP's bin folder to your PATH environment variable  \n    e.g.:  \n    C:\\Program Files\\GIMP 2\\bin",
+    "name" : "Chess",
+    "short" : "Chess in discord",
     "description" : "Play chess in discord using python-chess!",
     "requirements" : ["python-chess", "CairoSVG==1.0.22", "lxml", "tinycss", "cssselect", "jsonpickle"],
     "tags" : ["games"]

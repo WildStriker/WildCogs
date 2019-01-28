@@ -1,7 +1,7 @@
 {
+    "author" : ["WildStriker (WildStriker#6222)"],
     "name" : "WildCogs",
     "short" : "Whatever I can think of, as long as its fun",
-    "requirements" : [],
     "description" : "Play chess with your friends in discord, if thats your thing. Other Cogs comming soon?",
     "tags" : ["Fun", "Games"]
 }
