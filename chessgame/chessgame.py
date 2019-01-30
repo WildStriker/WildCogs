@@ -1,4 +1,4 @@
-'''cog to play chess in discord'''
+"""cog to play chess in discord"""
 from typing import Dict
 
 import cairosvg
@@ -10,7 +10,7 @@ from redbot.core import Config, commands
 
 
 class Game:
-    '''class used to hold state of a game'''
+    """class used to hold state of a game"""
 
     _style = 'text {' \
         'fill: orange' \
@@ -26,14 +26,14 @@ class Game:
         self._draw_offer_by = None
 
     def get_board_text(self) -> str:
-        '''returns the game board as text'''
+        """returns the game board as text"""
         return str(self._board)
 
     def get_board_image(self) -> bytes:
-        '''returns the game as an image
+        """returns the game as an image
 
         can't embed svg, so convert to png first
-        '''
+        """
 
         lastmove = self._board.peek() if self._board.move_stack else None
         check = self._board.king(self.turn) if self._board.is_check() else None
@@ -51,83 +51,83 @@ class Game:
         return image_board
 
     def move_piece(self, move):
-        '''move piece'''
+        """move piece"""
         move: chess.Move = self._board.push_san(move)
         self._arrows = [(move.from_square, move.to_square)]
 
     @property
     def total_moves(self) -> int:
-        '''total moves taken'''
+        """total moves taken"""
         return len(self._board.move_stack)
 
     @property
     def turn(self):
-        '''return which colour has the next turn'''
+        """return which colour has the next turn"""
         return self._board.turn
 
     @property
     def player_white_id(self) -> str:
-        '''returns the player assigned to white pieces'''
+        """returns the player assigned to white pieces"""
         return self._player_white_id
 
     @property
     def player_black_id(self) -> str:
-        '''returns the player assigned to black pieces'''
+        """returns the player assigned to black pieces"""
         return self._player_black_id
 
     @property
     def draw_offer_by(self) -> str:
-        '''returns the id of the player who offered draw'''
+        """returns the id of the player who offered draw"""
         return self._draw_offer_by
 
     @draw_offer_by.setter
     def draw_offer_by(self, player_id: str):
-        '''sets the id of the player who offered draw'''
+        """sets the id of the player who offered draw"""
         self._draw_offer_by = player_id
 
     @property
     def is_check(self) -> bool:
-        '''true if in check'''
+        """true if in check"""
         return self._board.is_check()
 
     @property
     def is_checkmate(self) -> bool:
-        '''true if in checkmate'''
+        """true if in checkmate"""
         return self._board.is_checkmate()
 
     @property
     def is_stalemate(self) -> bool:
-        '''true if draw by statemate'''
+        """true if draw by statemate"""
         return self._board.is_stalemate()
 
     @property
     def is_insufficient_material(self) -> bool:
-        '''true if draw by insufficient material'''
+        """true if draw by insufficient material"""
         return self._board.is_insufficient_material()
 
     @property
     def is_seventyfive_moves(self) -> bool:
-        '''true if draw by seventyfive moves'''
+        """true if draw by seventyfive moves"""
         return self._board.is_seventyfive_moves()
 
     @property
     def is_fivefold_repetition(self) -> bool:
-        '''true if draw by fivefold repetition'''
+        """true if draw by fivefold repetition"""
         return self._board.is_fivefold_repetition()
 
     @property
     def can_claim_draw(self):
-        '''true if players can claim a draw'''
+        """true if players can claim a draw"""
         return self._board.can_claim_draw()
 
     @property
     def can_claim_fifty_moves(self):
-        '''true if players can claim a draw by fifty moves'''
+        """true if players can claim a draw by fifty moves"""
         return self._board.can_claim_fifty_moves()
 
     @property
     def can_claim_threefold_repetition(self):
-        '''true if players can claim a draw by threefold repetition'''
+        """true if players can claim a draw by threefold repetition"""
         return self._board.can_claim_threefold_repetition()
 
 
@@ -136,7 +136,7 @@ Games = Dict[str, Game]
 
 
 class ChessGame(commands.Cog):
-    '''Cog to Play chess!'''
+    """Cog to Play chess!"""
 
     _fifty_moves = 'Fifty moves'
     _threefold_repetition = 'Threefold repetition'
@@ -161,12 +161,12 @@ class ChessGame(commands.Cog):
 
     @commands.group()
     async def chess(self, ctx: commands.Context):
-        '''manage chess games'''
+        """manage chess games"""
 
     @chess.command(name='start', autohelp=False)
     async def start_game(self, ctx: commands.Context,
                          other_player: discord.Member, game_name: str = None):
-        '''sub command to start a new game'''
+        """sub command to start a new game"""
 
         # get games config
         games = await self._get_games(ctx.channel)
@@ -203,14 +203,14 @@ class ChessGame(commands.Cog):
         await self._display_board(ctx, embed, game)
 
     async def _display_board(self, ctx: commands.Context, embed: discord.Embed, game: Game):
-        '''displays the game board'''
+        """displays the game board"""
         board_image = game.get_board_image()
         embed.set_image(url="attachment://board.png")
         await ctx.send(embed=embed, file=discord.File(board_image, 'board.png'))
 
     @chess.command(name='list', autohelp=False)
     async def list_games(self, ctx: commands.Context):
-        '''list all available games'''
+        """list all available games"""
         no_games = True
 
         max_len = 1000
@@ -274,7 +274,7 @@ class ChessGame(commands.Cog):
 
     @chess.command(name='move', autohelp=False)
     async def move_piece(self, ctx: commands.Context, game_name: str, move: str):
-        '''move the next game piece, using Standard Algebraic Notation'''
+        """move the next game piece, using Standard Algebraic Notation"""
 
         embed: discord.Embed = discord.Embed()
         embed.title = "Chess"
@@ -389,11 +389,11 @@ class ChessGame(commands.Cog):
 
     @chess.group(name='draw')
     async def draw(self, ctx: commands.Context):
-        '''draw related commands'''
+        """draw related commands"""
 
     @draw.command(name='claim', autohelp=False)
     async def claim_draw(self, ctx: commands.Context, game_name: str, claim_type: str):
-        '''if valid claim made to draw the game will end with no victor'''
+        """if valid claim made to draw the game will end with no victor"""
 
         games = await self._get_games(ctx.channel)
         game = games[game_name]
@@ -428,11 +428,11 @@ class ChessGame(commands.Cog):
 
     @draw.group(name='byagreement')
     async def by_agreement(self, ctx: commands.Context):
-        '''end game by draw if both players agree'''
+        """end game by draw if both players agree"""
 
     @by_agreement.command(name='offer', autohelp=False)
     async def offer_draw(self, ctx: commands.Context, game_name: str):
-        '''Offer draw by agreement'''
+        """Offer draw by agreement"""
 
         games = await self._get_games(ctx.channel)
         game = games[game_name]
@@ -475,7 +475,7 @@ class ChessGame(commands.Cog):
 
     @by_agreement.command(name='accept', autohelp=False)
     async def accept_draw(self, ctx: commands.Context, game_name: str):
-        '''Accept draw by agreement if the other player offered'''
+        """Accept draw by agreement if the other player offered"""
         games = await self._get_games(ctx.channel)
         game = games[game_name]
 
@@ -519,7 +519,7 @@ class ChessGame(commands.Cog):
 
     @by_agreement.command(name='decline', autohelp=False)
     async def decline_draw(self, ctx: commands.Context, game_name: str):
-        '''Decline draw by agreement.  Can be done by either player'''
+        """Decline draw by agreement.  Can be done by either player"""
         games = await self._get_games(ctx.channel)
         game = games[game_name]
 
