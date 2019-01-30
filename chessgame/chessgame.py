@@ -135,7 +135,7 @@ class Game:
 Games = Dict[str, Game]
 
 
-class Chess(commands.Cog):
+class ChessGame(commands.Cog):
     '''Cog to Play chess!'''
 
     _fifty_moves = 'Fifty moves'
