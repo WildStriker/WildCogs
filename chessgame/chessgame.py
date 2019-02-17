@@ -395,13 +395,20 @@ class ChessGame(commands.Cog):
     async def claim_draw(self, ctx: commands.Context, game_name: str, claim_type: str):
         """if valid claim made to draw the game will end with no victor"""
 
-        games = await self._get_games(ctx.channel)
-        game = games[game_name]
-
         embed: discord.Embed = discord.Embed()
 
         embed.title = "Chess"
         embed.description = "Claim Draw"
+
+        try:
+            games = await self._get_games(ctx.channel)
+            game = games[game_name]
+        except KeyError:
+            embed.add_field(name="Game does not exist",
+                            value="This game doesn't appear to exist, please check the "
+                            "game list to ensure you are entering it correctly")
+            await ctx.send(embed=embed)
+            return
 
         if self._fifty_moves == claim_type and game.can_claim_fifty_moves:
             embed.add_field(
@@ -434,13 +441,20 @@ class ChessGame(commands.Cog):
     async def offer_draw(self, ctx: commands.Context, game_name: str):
         """Offer draw by agreement"""
 
-        games = await self._get_games(ctx.channel)
-        game = games[game_name]
-
         embed: discord.Embed = discord.Embed()
 
         embed.title = "Chess"
         embed.description = "Offer Draw"
+
+        try:
+            games = await self._get_games(ctx.channel)
+            game = games[game_name]
+        except KeyError:
+            embed.add_field(name="Game does not exist",
+                            value="This game doesn't appear to exist, please check the "
+                            "game list to ensure you are entering it correctly")
+            await ctx.send(embed=embed)
+            return
 
         # identify the other player to mention
         if ctx.author.id == game.player_black_id:
@@ -476,13 +490,21 @@ class ChessGame(commands.Cog):
     @by_agreement.command(name='accept', autohelp=False)
     async def accept_draw(self, ctx: commands.Context, game_name: str):
         """Accept draw by agreement if the other player offered"""
-        games = await self._get_games(ctx.channel)
-        game = games[game_name]
 
         embed: discord.Embed = discord.Embed()
 
         embed.title = "Chess"
         embed.description = "Accept Draw"
+
+        try:
+            games = await self._get_games(ctx.channel)
+            game = games[game_name]
+        except KeyError:
+            embed.add_field(name="Game does not exist",
+                            value="This game doesn't appear to exist, please check the "
+                            "game list to ensure you are entering it correctly")
+            await ctx.send(embed=embed)
+            return
 
         # identify the player that offered draw
         if ctx.author.id == game.player_black_id:
@@ -520,13 +542,20 @@ class ChessGame(commands.Cog):
     @by_agreement.command(name='decline', autohelp=False)
     async def decline_draw(self, ctx: commands.Context, game_name: str):
         """Decline draw by agreement.  Can be done by either player"""
-        games = await self._get_games(ctx.channel)
-        game = games[game_name]
-
         embed: discord.Embed = discord.Embed()
 
         embed.title = "Chess"
         embed.description = "Decline Draw"
+
+        try:
+            games = await self._get_games(ctx.channel)
+            game = games[game_name]
+        except KeyError:
+            embed.add_field(name="Game does not exist",
+                            value="This game doesn't appear to exist, please check the "
+                            "game list to ensure you are entering it correctly")
+            await ctx.send(embed=embed)
+            return
 
         # can't decline if they aren't in the game
         if ctx.author.id != game.player_black_id and ctx.author.id == game.player_white_id:
