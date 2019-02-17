@@ -178,14 +178,14 @@ class ChessGame(commands.Cog):
 
         # init game_name if not provided
         if not game_name:
-            game_name = f'{player_black.name} vs {player_white.name}'
+            game_name = f'game'
 
         # make game_name unique if already exists
         count = 0
         suffix = ''
         while game_name + suffix in games.keys():
             count += 1
-            suffix = f' - {count}'
+            suffix = f'{count}'
 
         game_name += suffix
 
