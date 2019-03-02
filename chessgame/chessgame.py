@@ -1,4 +1,5 @@
 """cog to play chess in discord"""
+from concurrent import futures
 from typing import Dict
 
 import cairosvg
@@ -7,6 +8,8 @@ import chess.svg
 import discord
 import jsonpickle
 from redbot.core import Config, commands
+from redbot.core.utils.menus import start_adding_reactions
+from redbot.core.utils.predicates import ReactionPredicate
 
 
 class Game:
@@ -23,7 +26,6 @@ class Game:
 
         self._player_black_id = player_black_id
         self._player_white_id = player_white_id
-        self._draw_offer_by = None
 
     def get_board_text(self) -> str:
         """returns the game board as text"""
@@ -74,16 +76,6 @@ class Game:
     def player_black_id(self) -> str:
         """returns the player assigned to black pieces"""
         return self._player_black_id
-
-    @property
-    def draw_offer_by(self) -> str:
-        """returns the id of the player who offered draw"""
-        return self._draw_offer_by
-
-    @draw_offer_by.setter
-    def draw_offer_by(self, player_id: str):
-        """sets the id of the player who offered draw"""
-        self._draw_offer_by = player_id
 
     @property
     def is_check(self) -> bool:
@@ -433,12 +425,8 @@ class ChessGame(commands.Cog):
 
         await ctx.send(embed=embed)
 
-    @draw.group(name='byagreement')
-    async def by_agreement(self, ctx: commands.Context):
-        """end game by draw if both players agree"""
-
-    @by_agreement.command(name='offer', autohelp=False)
-    async def offer_draw(self, ctx: commands.Context, game_name: str):
+    @draw.group(name='byagreement', autohelp=False)
+    async def by_agreement(self, ctx: commands.Context, game_name: str):
         """Offer draw by agreement"""
 
         embed: discord.Embed = discord.Embed()
@@ -468,114 +456,34 @@ class ChessGame(commands.Cog):
             await ctx.send(embed=embed)
             return
 
-        if game.draw_offer_by:
-            if game.draw_offer_by == ctx.author.id:
-                embed.add_field(
-                    name="Offer Already Given",
-                    value="You have already offered a draw, wait for the other players response")
-            else:
-                embed.add_field(
-                    name="You Must Accept Offer",
-                    value="The other player has offered a draw, "
-                    "please respond with the accept subcommand instead.")
-        else:
-            game.draw_offer_by = ctx.author.id
-            embed.add_field(
-                name=f"{ctx.author.name} has offered a draw",
-                value=f"<@{other_player}> please response back with "
-                "the accept or decline subcommand")
-            await self._set_games(ctx.channel, games)
-        await ctx.send(embed=embed)
+        embed.add_field(
+            name=f"{ctx.author.name} has offered a draw",
+            value=f"<@{other_player}> respond below:")
 
-    @by_agreement.command(name='accept', autohelp=False)
-    async def accept_draw(self, ctx: commands.Context, game_name: str):
-        """Accept draw by agreement if the other player offered"""
+        message = await ctx.send(embed=embed)
 
-        embed: discord.Embed = discord.Embed()
+        # yes / no reaction options
+        start_adding_reactions(message, ReactionPredicate.YES_OR_NO_EMOJIS)
 
-        embed.title = "Chess"
-        embed.description = "Accept Draw"
-
+        pred = ReactionPredicate.yes_or_no(
+            message,
+            ctx.guild.get_member(game.player_white_id))
         try:
-            games = await self._get_games(ctx.channel)
-            game = games[game_name]
-        except KeyError:
-            embed.add_field(name="Game does not exist",
-                            value="This game doesn't appear to exist, please check the "
-                            "game list to ensure you are entering it correctly")
-            await ctx.send(embed=embed)
-            return
-
-        # identify the player that offered draw
-        if ctx.author.id == game.player_black_id:
-            other_player = game.player_white_id
-        elif ctx.author.id == game.player_white_id:
-            other_player = game.player_black_id
-        else:  # not part of this game
-            embed.add_field(
-                name="You are not part of this game",
-                value="You are not able to accept a draw if you are not one of the players.")
-            await ctx.send(embed=embed)
-            return
-
-        if game.draw_offer_by:
-            if other_player == game.draw_offer_by:
+            await ctx.bot.wait_for("reaction_add", check=pred, timeout=30)
+            if pred.result is True:
                 embed.add_field(
-                    name=f'{ctx.author.name} Accepts',
-                    value='Game has ended in a draw by agreement!')
-
+                    name="Response:",
+                    value="Draw accepted!")
                 del games[game_name]
                 await self._set_games(ctx.channel, games)
             else:
                 embed.add_field(
-                    name='Cannot Accept',
-                    value=f'You can not accept if you are the one that has offered the draw'
-                )
-        else:
+                    name="Response:",
+                    value="Draw declined!")
+        except futures.TimeoutError:
             embed.add_field(
-                name='No Draw Offer',
-                value='No one has offered draw by agreement'
-            )
+                name="Timed out:",
+                value=f"<@{other_player}> did not respond in time.")
 
-        await ctx.send(embed=embed)
-
-    @by_agreement.command(name='decline', autohelp=False)
-    async def decline_draw(self, ctx: commands.Context, game_name: str):
-        """Decline draw by agreement.  Can be done by either player"""
-        embed: discord.Embed = discord.Embed()
-
-        embed.title = "Chess"
-        embed.description = "Decline Draw"
-
-        try:
-            games = await self._get_games(ctx.channel)
-            game = games[game_name]
-        except KeyError:
-            embed.add_field(name="Game does not exist",
-                            value="This game doesn't appear to exist, please check the "
-                            "game list to ensure you are entering it correctly")
-            await ctx.send(embed=embed)
-            return
-
-        # can't decline if they aren't in the game
-        if ctx.author.id != game.player_black_id and ctx.author.id == game.player_white_id:
-            embed.add_field(
-                name="You are not part of this game",
-                value="You are not able to decline a draw if you are not one of the players.")
-            await ctx.send(embed=embed)
-            return
-
-        if game.draw_offer_by:
-            embed.add_field(
-                name=f'{ctx.author.name} Declined',
-                value='Draw by agreement has been decline, the game continues!')
-
-            game.draw_offer_by = None
-            await self._set_games(ctx.channel, games)
-        else:
-            embed.add_field(
-                name='No Draw Offer',
-                value='No one has offered draw by agreement'
-            )
-
-        await ctx.send(embed=embed)
+        await message.edit(embed=embed)
+        await message.clear_reactions()
