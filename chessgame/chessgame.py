@@ -2,126 +2,13 @@
 from concurrent import futures
 from typing import Dict
 
-import cairosvg
-import chess
-import chess.svg
 import discord
 import jsonpickle
 from redbot.core import Config, commands
 from redbot.core.utils.menus import start_adding_reactions
 from redbot.core.utils.predicates import ReactionPredicate
 
-
-class Game:
-    """class used to hold state of a game"""
-
-    _style = 'text {' \
-        'fill: orange' \
-        '}'
-
-    def __init__(self, player_black_id, player_white_id):
-
-        self._board = chess.Board()
-        self._arrows = ()
-
-        self._player_black_id = player_black_id
-        self._player_white_id = player_white_id
-
-    def get_board_text(self) -> str:
-        """returns the game board as text"""
-        return str(self._board)
-
-    def get_board_image(self) -> bytes:
-        """returns the game as an image
-
-        can't embed svg, so convert to png first
-        """
-
-        lastmove = self._board.peek() if self._board.move_stack else None
-        check = self._board.king(self.turn) if self._board.is_check() else None
-
-        # get svg string
-        svg_board = chess.svg.board(
-            board=self._board,
-            lastmove=lastmove,
-            check=check,
-            arrows=self._arrows,
-            style=self._style).encode()
-
-        # convert to png
-        image_board = cairosvg.svg2png(bytestring=svg_board)
-        return image_board
-
-    def move_piece(self, move):
-        """move piece"""
-        move: chess.Move = self._board.push_san(move)
-        self._arrows = [(move.from_square, move.to_square)]
-
-    @property
-    def total_moves(self) -> int:
-        """total moves taken"""
-        return len(self._board.move_stack)
-
-    @property
-    def turn(self):
-        """return which colour has the next turn"""
-        return self._board.turn
-
-    @property
-    def player_white_id(self) -> str:
-        """returns the player assigned to white pieces"""
-        return self._player_white_id
-
-    @property
-    def player_black_id(self) -> str:
-        """returns the player assigned to black pieces"""
-        return self._player_black_id
-
-    @property
-    def is_check(self) -> bool:
-        """true if in check"""
-        return self._board.is_check()
-
-    @property
-    def is_checkmate(self) -> bool:
-        """true if in checkmate"""
-        return self._board.is_checkmate()
-
-    @property
-    def is_stalemate(self) -> bool:
-        """true if draw by statemate"""
-        return self._board.is_stalemate()
-
-    @property
-    def is_insufficient_material(self) -> bool:
-        """true if draw by insufficient material"""
-        return self._board.is_insufficient_material()
-
-    @property
-    def is_seventyfive_moves(self) -> bool:
-        """true if draw by seventyfive moves"""
-        return self._board.is_seventyfive_moves()
-
-    @property
-    def is_fivefold_repetition(self) -> bool:
-        """true if draw by fivefold repetition"""
-        return self._board.is_fivefold_repetition()
-
-    @property
-    def can_claim_draw(self):
-        """true if players can claim a draw"""
-        return self._board.can_claim_draw()
-
-    @property
-    def can_claim_fifty_moves(self):
-        """true if players can claim a draw by fifty moves"""
-        return self._board.can_claim_fifty_moves()
-
-    @property
-    def can_claim_threefold_repetition(self):
-        """true if players can claim a draw by threefold repetition"""
-        return self._board.can_claim_threefold_repetition()
-
+from .game import Game
 
 # type hints
 Games = Dict[str, Game]
@@ -286,19 +173,19 @@ class ChessGame(commands.Cog):
         player_white = ctx.guild.get_member(game.player_white_id)
         player_black = ctx.guild.get_member(game.player_black_id)
 
-        if game.turn == chess.WHITE:
-            turn_color = 'White'
+        turn_color, player_turn, player_next = game.order
+        # convert ids to members
+        if player_turn == game.player_white_id:
             player_turn = player_white
             player_next = player_black
         else:
-            turn_color = 'Black'
             player_turn = player_black
             player_next = player_white
 
         if player_turn == ctx.author:
             # it is their turn
             try:
-                game.move_piece(move)
+                is_game_over, value_move = game.move_piece(move)
             except ValueError:
                 embed.add_field(name="Invalid Move Taken!",
                                 value=f"'{move}' isn't a valid move, try again.")
@@ -307,31 +194,6 @@ class ChessGame(commands.Cog):
 
             name_move = f"Move: {game.total_moves} - " \
                 f"{player_turn.name}'s ({turn_color}'s) Turn"
-
-            is_game_over = False
-            if game.is_checkmate:
-                is_game_over = True
-                value_move = f"Checkmate! <@{ctx.author.id}> Wins!"
-            elif game.is_check:
-                value_move = f"<@{player_next.id}> you are in check. Your move is next."
-            elif game.is_stalemate:
-                is_game_over = True
-                value_move = "Draw by stalemate!\n" \
-                    f"<@{player_next.id}> is not in check and can only move into check! !"
-            elif game.is_insufficient_material:
-                is_game_over = True
-                value_move = "Draw by insufficient material!\n" \
-                    "Neither player has enough pieces to win"
-            elif game.is_seventyfive_moves:
-                is_game_over = True
-                value_move = "Draw by seventyfive moves rule!" \
-                    "There are been no captures or pawns moved in the last 75 moves"
-            elif game.is_fivefold_repetition:
-                is_game_over = True
-                value_move = "Draw by fivefold repetition!" \
-                    "Position has occured five times"
-            else:
-                value_move = f"<@{player_next.id}> you're up next!"
 
             if is_game_over:
                 del games[game_name]
