@@ -1,9 +1,10 @@
-"""module contains Game class"""
+"""module contains Game class and helper function to list variants"""
 from typing import Tuple
 
 import cairosvg
 import chess
 import chess.svg
+import chess.variant
 
 
 class Game:
@@ -13,9 +14,12 @@ class Game:
         'fill: orange' \
         '}'
 
-    def __init__(self, player_black_id, player_white_id):
+    def __init__(self, player_black_id, player_white_id, variant_name=None):
+        if not variant_name:
+            variant_name = 'Standard'
 
-        self._board = chess.Board()
+        self._board = chess.variant.find_variant(variant_name)()
+
         self._arrows = ()
 
         self._player_black_id = player_black_id
@@ -54,6 +58,16 @@ class Game:
 
         move: chess.Move = self._board.push_san(move)
         self._arrows = [(move.from_square, move.to_square)]
+
+        # Chess variants
+        if self._board.is_variant_loss():
+            return True, f"<@{self.player_black_id}> wins!"
+
+        if self._board.is_variant_win():
+            return True, f"<@{self.player_white_id}> wins!"
+
+        if self._board.is_variant_draw():
+            return True, f"Draw! Game Over!"
 
         # Checkmate.
         if self._board.is_checkmate():
@@ -121,3 +135,21 @@ class Game:
     def can_claim_threefold_repetition(self):
         """true if players can claim a draw by threefold repetition"""
         return self._board.can_claim_threefold_repetition()
+
+    @property
+    def type(self):
+        """return the first alias"""
+        return self._board.aliases[0]
+
+
+def start_help_text():
+    """list the variant aliases that can be used"""
+    message = []
+
+    message.append('start a new game\n')
+    message.append('_Standard is the default when no game type is given_')
+    for count, variant in enumerate(chess.variant.VARIANTS, 1):
+        aliases = ', '.join(variant.aliases)
+        message.append(f'__**{count}**__: {aliases}')
+
+    return '\n'.join(message)

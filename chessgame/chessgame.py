@@ -8,7 +8,7 @@ from redbot.core import Config, commands
 from redbot.core.utils.menus import start_adding_reactions
 from redbot.core.utils.predicates import ReactionPredicate
 
-from .game import Game
+from .game import Game, start_help_text
 
 # type hints
 Games = Dict[str, Game]
@@ -42,9 +42,10 @@ class ChessGame(commands.Cog):
     async def chess(self, ctx: commands.Context):
         """manage chess games"""
 
-    @chess.command(name='start', autohelp=False)
+    @chess.command(name='start', autohelp=False, help=start_help_text())
     async def start_game(self, ctx: commands.Context,
-                         other_player: discord.Member, game_name: str = None):
+                         other_player: discord.Member,
+                         game_name: str = None, game_type: str = None):
         """sub command to start a new game"""
 
         # get games config
@@ -68,7 +69,17 @@ class ChessGame(commands.Cog):
 
         game_name += suffix
 
-        game = Game(player_black.id, player_white.id)
+        embed: discord.Embed = discord.Embed()
+        embed.title = "Chess"
+        embed.description = f"Game: {game_name}"
+
+        try:
+            game = Game(player_black.id, player_white.id, game_type)
+        except ValueError:
+            embed.add_field(name='Invalid Game Type:', value=game_type)
+            await ctx.send(embed=embed)
+            return
+
         games[game_name] = game
 
         await self._set_games(ctx.channel, games)
@@ -76,8 +87,11 @@ class ChessGame(commands.Cog):
         embed: discord.Embed = discord.Embed()
         embed.title = "Chess"
         embed.description = f"Game: {game_name}"
+        embed.add_field(name="Type:", value=game.type, inline=False)
+
         embed.add_field(name="New Game",
-                        value=f"<@{player_white.id}>'s (White's) turn is first")
+                        value=f"<@{player_white.id}>'s (White's) turn is first",
+                        inline=False)
 
         await self._display_board(ctx, embed, game)
 
@@ -116,9 +130,10 @@ class ChessGame(commands.Cog):
 
                 count += 1
                 current_game = f'\n** Game: #{count}** - __{game_name}__\n' \
-                    f'```\tBlack: {player_black.name}\n' \
-                    f'\tWhite: {player_white.name}\n' \
-                    f'\tTotal Moves: {game.total_moves}```'
+                    f'```Black: {player_black.name}\n' \
+                    f'White: {player_white.name}\n' \
+                    f'Total Moves: {game.total_moves}\n' \
+                    f'Type: {game.type}```'
 
                 current_game_len = len(current_game)
 
@@ -126,7 +141,8 @@ class ChessGame(commands.Cog):
                 if total_len + current_game_len > max_len:
                     embed.add_field(
                         name=f'Channel - {channel}',
-                        value='__List of games:__' + output)
+                        value='__List of games:__' + output,
+                        inline=False)
                     output = current_game
                     total_len = current_game_len
 
@@ -142,7 +158,8 @@ class ChessGame(commands.Cog):
             # add field for remaining
             embed.add_field(
                 name=f'Channel - {channel}',
-                value='__List of games:__' + output)
+                value='__List of games:__' + output,
+                inline=False)
 
         if no_games:
             embed.add_field(name="No Games Available",
@@ -169,6 +186,8 @@ class ChessGame(commands.Cog):
                             "game list to ensure you are entering it correctly")
             await ctx.send(embed=embed)
             return
+
+        embed.add_field(name="Type:", value=game.type, inline=False)
 
         player_white = ctx.guild.get_member(game.player_white_id)
         player_black = ctx.guild.get_member(game.player_black_id)
