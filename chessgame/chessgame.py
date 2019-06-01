@@ -1,4 +1,5 @@
 """cog to play chess in discord"""
+import io
 from concurrent import futures
 from typing import Dict
 
@@ -97,7 +98,7 @@ class ChessGame(commands.Cog):
 
     async def _display_board(self, ctx: commands.Context, embed: discord.Embed, game: Game):
         """displays the game board"""
-        board_image = game.get_board_image()
+        board_image = io.BytesIO(game.get_board_image())
         embed.set_image(url="attachment://board.png")
         await ctx.send(embed=embed, file=discord.File(board_image, 'board.png'))
 
