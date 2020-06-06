@@ -1,6 +1,6 @@
 """cog to play chess in discord"""
 import io
-from concurrent import futures
+import asyncio
 from typing import Dict
 
 import discord
@@ -362,7 +362,7 @@ class ChessGame(commands.Cog):
                 embed.add_field(
                     name="Response:",
                     value="Draw declined!")
-        except futures.TimeoutError:
+        except asyncio.TimeoutError:
             embed.add_field(
                 name="Timed out:",
                 value=f"<@{other_player}> did not respond in time.")
