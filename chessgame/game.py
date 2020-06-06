@@ -109,7 +109,7 @@ class Game:
         if self._board.turn == chess.WHITE:
             return 'White', self.player_white_id, self.player_black_id
         else:
-            return 'Black', self.player_black_id, self.player_black_id
+            return 'Black', self.player_black_id, self.player_white_id
 
     @property
     def player_white_id(self) -> str:
