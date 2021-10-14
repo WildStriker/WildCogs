@@ -49,6 +49,50 @@ class ChessGame(commands.Cog):
                          game_name: str = None, game_type: str = None):
         """sub command to start a new game"""
 
+        # let's ask the other player if they want to play the game!
+        embed: discord.Embed = discord.Embed()
+
+        embed.title = "Chess"
+        embed.description = "New Game"
+
+        embed.add_field(
+            name=f"{ctx.author.name} would like to start a game!",
+            value=f"<@{other_player.id}> respond below:")
+
+        message = await ctx.send(embed=embed)
+
+        # yes / no reaction options
+        start_adding_reactions(message, ReactionPredicate.YES_OR_NO_EMOJIS)
+
+        pred = ReactionPredicate.yes_or_no(
+            message,
+            other_player)
+
+        create_game = True
+        try:
+            await ctx.bot.wait_for("reaction_add", check=pred, timeout=600)
+            if not pred.result:
+                create_game = False
+                embed.add_field(
+                    name="Response:",
+                    value="Game request was declined!")
+        except asyncio.TimeoutError:
+            create_game = False
+            embed.add_field(
+                name="Timed out:",
+                value=f"<@{other_player.id}> did not respond in time.")
+
+        if create_game:
+            # remove message prompt
+            await message.delete()
+        else:
+            # game will not be created
+            # update message with response / timeout error
+            await message.edit(embed=embed)
+            await message.clear_reactions()
+            return
+
+
         # get games config
         games = await self._get_games(ctx.channel)
         if not games:
