@@ -393,7 +393,7 @@ class ChessGame(commands.Cog):
 
         pred = ReactionPredicate.yes_or_no(
             message,
-            ctx.guild.get_member(game.player_white_id))
+            ctx.guild.get_member(other_player))
         try:
             await ctx.bot.wait_for("reaction_add", check=pred, timeout=30)
             if pred.result is True:
