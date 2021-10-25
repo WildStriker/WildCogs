@@ -139,16 +139,10 @@ class ChessGame(commands.Cog):
                         inline=False)
 
         await self._display_board(ctx, embed, game)
-
-    async def _display_board(self, ctx: commands.Context, embed: discord.Embed, game: Game):
-        """displays the game board"""
-        board_image = io.BytesIO(game.get_board_image())
-        embed.set_image(url="attachment://board.png")
-        await ctx.send(embed=embed, file=discord.File(board_image, 'board.png'))
         
     @commands.is_owner()
     @chess.command(name='launch', autohelp=False, help=start_help_text())
-    async def start_game(self, ctx: commands.Context,
+    async def launch_game(self, ctx: commands.Context,
                          player: discord.Member, other_player: discord.Member,
                          game_name: str = None, game_type: str = None):
         """sub command to launch a new game between two members"""
