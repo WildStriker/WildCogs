@@ -145,6 +145,138 @@ class ChessGame(commands.Cog):
         board_image = io.BytesIO(game.get_board_image())
         embed.set_image(url="attachment://board.png")
         await ctx.send(embed=embed, file=discord.File(board_image, 'board.png'))
+        
+    @commands.is_owner()
+    @chess.command(name='launch', autohelp=False, help=start_help_text())
+    async def start_game(self, ctx: commands.Context,
+                         player: discord.Member, other_player: discord.Member,
+                         game_name: str = None, game_type: str = None):
+        """sub command to launch a new game between two members"""
+
+        # let's ask the other player if they want to play the game!
+        embed: discord.Embed = discord.Embed()
+
+        embed.title = "Chess"
+        embed.description = "New Game"
+
+        embed.add_field(
+            name=f"Do you want to play against {other_player.name}? (not yet agreed)",
+            value=f"<@{player.id}> respond below:")
+        message = await ctx.send(embed=embed)
+        # yes / no reaction options
+        start_adding_reactions(message, ReactionPredicate.YES_OR_NO_EMOJIS)
+        pred = ReactionPredicate.yes_or_no(
+            message,
+            player)
+        create_game_player = True
+        try:
+            await ctx.bot.wait_for("reaction_add", check=pred, timeout=600)
+            if not pred.result:
+                create_game_player = False
+                embed.add_field(
+                    name="Response:",
+                    value="One of the players refused the game!")
+        except asyncio.TimeoutError:
+            create_game = False
+            embed.add_field(
+                name="Timed out:",
+                value=f"<@{player.id}> did not respond in time.")
+
+        if create_game_player:
+            # remove message prompt
+            await message.delete()
+            embed.add_field(
+                name=f"{player.name} would like to start a game!",
+                value=f"<@{other_player.id}> respond below:")
+            message = await ctx.send(embed=embed)
+            # yes / no reaction options
+            start_adding_reactions(message, ReactionPredicate.YES_OR_NO_EMOJIS)
+            pred = ReactionPredicate.yes_or_no(
+                message,
+                other_player)
+            create_game = True
+            try:
+                await ctx.bot.wait_for("reaction_add", check=pred, timeout=600)
+                if not pred.result:
+                    create_game = False
+                    embed.add_field(
+                        name="Response:",
+                        value="One of the players refused the game!")
+            except asyncio.TimeoutError:
+                create_game = False
+                embed.add_field(
+                    name="Timed out:",
+                    value=f"<@{other_player.id}> did not respond in time.")
+        else:
+            # game will not be created
+            # update message with response / timeout error
+            await message.edit(embed=embed)
+            await message.clear_reactions()
+            return
+
+        if create_game:
+            # remove message prompt
+            await message.delete()
+        else:
+            # game will not be created
+            # update message with response / timeout error
+            await message.edit(embed=embed)
+            await message.clear_reactions()
+            return
+
+
+        # get games config
+        games = await self._get_games(ctx.channel)
+        if not games:
+            games = {}
+
+        player_black = player
+        player_white = other_player
+
+        # init game_name if not provided
+        if not game_name:
+            game_name = f'game'
+
+        # make game_name unique if already exists
+        count = 0
+        suffix = ''
+        while game_name + suffix in games.keys():
+            count += 1
+            suffix = f'{count}'
+
+        game_name += suffix
+
+        embed: discord.Embed = discord.Embed()
+        embed.title = "Chess"
+        embed.description = f"Game: {game_name}"
+
+        try:
+            game = Game(player_black.id, player_white.id, game_type)
+        except ValueError:
+            embed.add_field(name='Invalid Game Type:', value=game_type)
+            await ctx.send(embed=embed)
+            return
+
+        games[game_name] = game
+
+        await self._set_games(ctx.channel, games)
+
+        embed: discord.Embed = discord.Embed()
+        embed.title = "Chess"
+        embed.description = f"Game: {game_name}"
+        embed.add_field(name="Type:", value=game.type, inline=False)
+
+        embed.add_field(name="New Game",
+                        value=f"<@{player_white.id}>'s (White's) turn is first",
+                        inline=False)
+
+        await self._display_board(ctx, embed, game)
+
+    async def _display_board(self, ctx: commands.Context, embed: discord.Embed, game: Game):
+        """displays the game board"""
+        board_image = io.BytesIO(game.get_board_image())
+        embed.set_image(url="attachment://board.png")
+        await ctx.send(embed=embed, file=discord.File(board_image, 'board.png'))
 
     @chess.command(name='list', autohelp=False)
     async def list_games(self, ctx: commands.Context):
@@ -413,3 +545,58 @@ class ChessGame(commands.Cog):
 
         await message.edit(embed=embed)
         await message.clear_reactions()
+        
+    @commands.is_owner()
+    @chess.command()
+    async def close(self, ctx: commands.Context, game_name: str, channel: discord.TextChannel = None):
+        """sub command to close a game"""
+
+        embed: discord.Embed = discord.Embed()
+
+        embed.title = "Chess"
+        embed.description = "Close Game"
+
+        if channel is None:
+            channel = ctx.channel
+
+        try:
+            games = await self._get_games(channel)
+            game = games[game_name]
+        except KeyError:
+            embed.add_field(name="Game does not exist",
+                            value="This game doesn't appear to exist, please check the "
+                            "game list to ensure you are entering it correctly.")
+            await ctx.send(embed=embed)
+            return
+
+        embed.add_field(
+            name=f"Do you really want to delete this game?",
+            value=f"<@{ctx.author.id}> respond below:")
+
+        message = await ctx.send(embed=embed)
+
+        # yes / no reaction options
+        start_adding_reactions(message, ReactionPredicate.YES_OR_NO_EMOJIS)
+
+        pred = ReactionPredicate.yes_or_no(
+            message,
+            ctx.guild.get_member(ctx.author.id))
+        try:
+            await ctx.bot.wait_for("reaction_add", check=pred, timeout=10)
+            if pred.result is True:
+                embed.add_field(
+                    name="Response:",
+                    value="Game closed!")
+                del games[game_name]
+                await self._set_games(ctx.channel, games)
+                await message.edit(embed=embed)
+                await message.clear_reactions()
+            else:
+                embed.add_field(
+                    name="Response:",
+                    value="Close declined!")
+                await message.edit(embed=embed)
+                await message.clear_reactions()
+        except asyncio.TimeoutError:
+            await message.clear_reactions()
+            await message.delete(embed=embed)
