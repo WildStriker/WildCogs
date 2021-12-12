@@ -92,54 +92,8 @@ class ChessGame(commands.Cog):
             await message.clear_reactions()
             return
 
+        await self._start_game(ctx, ctx.author, other_player, game_name, game_type)
 
-        # get games config
-        games = await self._get_games(ctx.channel)
-        if not games:
-            games = {}
-
-        player_black = ctx.author
-        player_white = other_player
-
-        # init game_name if not provided
-        if not game_name:
-            game_name = f'game'
-
-        # make game_name unique if already exists
-        count = 0
-        suffix = ''
-        while game_name + suffix in games.keys():
-            count += 1
-            suffix = f'{count}'
-
-        game_name += suffix
-
-        embed: discord.Embed = discord.Embed()
-        embed.title = "Chess"
-        embed.description = f"Game: {game_name}"
-
-        try:
-            game = Game(player_black.id, player_white.id, game_type)
-        except ValueError:
-            embed.add_field(name='Invalid Game Type:', value=game_type)
-            await ctx.send(embed=embed)
-            return
-
-        games[game_name] = game
-
-        await self._set_games(ctx.channel, games)
-
-        embed: discord.Embed = discord.Embed()
-        embed.title = "Chess"
-        embed.description = f"Game: {game_name}"
-        embed.add_field(name="Type:", value=game.type, inline=False)
-
-        embed.add_field(name="New Game",
-                        value=f"<@{player_white.id}>'s (White's) turn is first",
-                        inline=False)
-
-        await self._display_board(ctx, embed, game)
-        
     @commands.is_owner()
     @chess.command(name='launch', autohelp=False, help=start_help_text())
     async def launch_game(self, ctx: commands.Context,
@@ -218,14 +172,15 @@ class ChessGame(commands.Cog):
             await message.clear_reactions()
             return
 
+        await self._start_game(ctx, player, other_player, game_name, game_type)
 
+    async def _start_game(self, ctx: commands.Context,
+                         player_black: discord.Member, player_white: discord.Member,
+                         game_name: str = None, game_type: str = None):
         # get games config
         games = await self._get_games(ctx.channel)
         if not games:
             games = {}
-
-        player_black = player
-        player_white = other_player
 
         # init game_name if not provided
         if not game_name:
