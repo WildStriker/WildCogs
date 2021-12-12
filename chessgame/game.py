@@ -1,5 +1,5 @@
 """module contains Game class and helper function to list variants"""
-from typing import Tuple
+from typing import Optional, Tuple
 
 import cairosvg
 import chess
@@ -51,8 +51,19 @@ class Game:
         image_board = cairosvg.svg2png(bytestring=svg_board)
         return image_board
 
-    def move_piece(self, move) -> Tuple[bool, str]:
-        """move piece, if a valid move returns a tuple with game over flag and message"""
+    def move_piece(self, move) -> Tuple[bool, Optional[str], str]:
+        """move piece, if a valid move returns a tuple with game over flag and message
+
+        Args:
+            move: san movement of the next piece
+
+        Returns:
+            Tuple[bool, str, str]: returns a tuple with three values
+                                bool - True if the game is over
+                                str - this is an id of the player that is being notified
+                                str - this is a template message to be displayed,
+                                      use mention_id to fill in user id
+        """
 
         _, player_turn, player_next = self.order
 
@@ -61,41 +72,45 @@ class Game:
 
         # Chess variants
         if self._board.is_variant_loss():
-            return True, f"<@{self.player_black_id}> wins!"
+            mention = f"<@{self.player_black_id}>"
+            return True, mention, f"{mention} wins!"
 
         if self._board.is_variant_win():
-            return True, f"<@{self.player_white_id}> wins!"
+            mention = f"<@{self.player_white_id}>"
+            return True, mention, f"{mention} wins!"
 
         if self._board.is_variant_draw():
-            return True, f"Draw! Game Over!"
+            return True, None, "Draw! Game Over!"
 
         # Checkmate.
         if self._board.is_checkmate():
-            return True, f"Checkmate! <@{player_turn}> Wins!"
+            mention = f"<@{player_turn}>"
+            return True, mention, f"Checkmate! {mention} Wins!"
 
         # Seventyfive-move rule or fivefold repetition.
         if self._board.is_seventyfive_moves():
-            return True, "Draw by seventyfive moves rule!" \
+            return True, None, "Draw by seventyfive moves rule!" \
                 "There are been no captures or pawns moved in the last 75 moves"
 
         if self._board.is_fivefold_repetition():
-            return True, "Draw by fivefold repetition!" \
+            return True, None, "Draw by fivefold repetition!" \
                 "Position has occured five times"
 
         # Insufficient material.
         if self._board.is_insufficient_material():
-            return True, "Draw by insufficient material!\n" \
+            return True, None, "Draw by insufficient material!\n" \
                 "Neither player has enough pieces to win"
 
+        mention = f"<@{player_next}>"
         # Stalemate.
         if self._board.is_stalemate():
-            return True, "Draw by stalemate!\n" \
-                f"<@{player_next.id}> has no moves!"
+            return True, mention, "Draw by stalemate!\n" \
+                f"{mention} has no moves!"
 
         if self._board.is_check():
-            return False, f"<@{player_next}> you are in check. Your move is next."
+            return False, mention, f"{mention} you are in check. Your move is next."
 
-        return False, f"<@{player_next}> you're up next!"
+        return False, mention, f"{mention} you're up next!"
 
     @property
     def total_moves(self) -> int:

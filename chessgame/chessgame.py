@@ -138,13 +138,13 @@ class ChessGame(commands.Cog):
                         value=f"<@{player_white.id}>'s (White's) turn is first",
                         inline=False)
 
-        await self._display_board(ctx, embed, game)
+        await self._display_board(ctx, f"<@{player_white.id}>", embed, game)
 
-    async def _display_board(self, ctx: commands.Context, embed: discord.Embed, game: Game):
+    async def _display_board(self, ctx: commands.Context, content: str, embed: discord.Embed, game: Game):
         """displays the game board"""
         board_image = io.BytesIO(game.get_board_image())
         embed.set_image(url="attachment://board.png")
-        await ctx.send(embed=embed, file=discord.File(board_image, 'board.png'))
+        await ctx.send(content, embed=embed, file=discord.File(board_image, 'board.png'))
 
     @chess.command(name='list', autohelp=False)
     async def list_games(self, ctx: commands.Context):
@@ -249,7 +249,7 @@ class ChessGame(commands.Cog):
         if player_turn == ctx.author:
             # it is their turn
             try:
-                is_game_over, value_move = game.move_piece(move)
+                is_game_over, mention, value_move = game.move_piece(move)
             except ValueError:
                 embed.add_field(name="Invalid Move Taken!",
                                 value=f"'{move}' isn't a valid move, try again.")
@@ -289,7 +289,7 @@ class ChessGame(commands.Cog):
 
             await self._set_games(ctx.channel, games)
 
-            await self._display_board(ctx, embed, game)
+            await self._display_board(ctx, mention, embed, game)
         elif player_next == ctx.author:
             # not their turn yet
             embed.add_field(name=f"{player_next.name} - not your turn",
@@ -386,7 +386,7 @@ class ChessGame(commands.Cog):
             name=f"{ctx.author.name} has offered a draw",
             value=f"<@{other_player}> respond below:")
 
-        message = await ctx.send(embed=embed)
+        message = await ctx.send(f"<@{other_player}>", embed=embed)
 
         # yes / no reaction options
         start_adding_reactions(message, ReactionPredicate.YES_OR_NO_EMOJIS)
