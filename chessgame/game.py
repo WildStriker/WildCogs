@@ -60,9 +60,8 @@ class Game:
         Returns:
             Tuple[bool, str, str]: returns a tuple with three values
                                 bool - True if the game is over
-                                str - this is an id of the player that is being notified
-                                str - this is a template message to be displayed,
-                                      use mention_id to fill in user id
+                                str - mention tag for display
+                                str - resulting message after move
         """
 
         _, player_turn, player_next = self.order
