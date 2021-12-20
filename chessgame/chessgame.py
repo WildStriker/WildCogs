@@ -123,7 +123,8 @@ class ChessGame(commands.Cog):
             embed: discord.Embed = discord.Embed()
 
             embed.title = "Chess"
-            embed.description = f"Start a new game between {player.name} and {other_player.name}. Players, please respond below."
+            embed.description = (f"Start a new game between {player.name} and {other_player.name}."
+                                 " Players, please respond below.")
 
             for response in responses.values():
                 embed.add_field(
@@ -498,7 +499,10 @@ class ChessGame(commands.Cog):
 
     @commands.is_owner()
     @chess.command()
-    async def close(self, ctx: commands.Context, game_name: str, channel: discord.TextChannel = None):
+    async def close(self,
+                    ctx: commands.Context,
+                    game_name: str,
+                    channel: discord.TextChannel = None):
         """sub command to close a game"""
 
         embed: discord.Embed = discord.Embed()
@@ -511,7 +515,6 @@ class ChessGame(commands.Cog):
 
         try:
             games = await self._get_games(channel)
-            game = games[game_name]
         except KeyError:
             embed.add_field(name="Game does not exist",
                             value="This game doesn't appear to exist, please check the "
