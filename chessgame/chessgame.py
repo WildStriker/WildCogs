@@ -59,7 +59,7 @@ class ChessGame(commands.Cog):
             name=f"{ctx.author.name} would like to start a game!",
             value=f"<@{other_player.id}> respond below:")
 
-        message = await ctx.send(embed=embed)
+        message = await ctx.send(f"<@{other_player.id}>", embed=embed)
 
         # yes / no reaction options
         start_adding_reactions(message, ReactionPredicate.YES_OR_NO_EMOJIS)
@@ -92,14 +92,97 @@ class ChessGame(commands.Cog):
             await message.clear_reactions()
             return
 
+        await self._start_game(ctx, ctx.author, other_player, game_name, game_type)
 
+    @commands.is_owner()
+    @chess.command(name='launch', autohelp=False, help=start_help_text())
+    async def launch_game(self, ctx: commands.Context,
+                          player: discord.Member, other_player: discord.Member,
+                          game_name: str = None, game_type: str = None):
+        """sub command to launch a new game between two members"""
+
+        default_response = "Please Respond Below:"
+        users = {player.id, other_player.id}
+
+        responses = {
+            player.id: {
+                "name": player.name,
+            },
+            other_player.id: {
+                "name": other_player.name,
+            }
+        }
+
+        mention = ""
+        for user in users:
+            mention += f"<@{user}> "
+        mention = mention.strip()
+
+        def update_embed():
+            # let's ask the other player if they want to play the game!
+            embed: discord.Embed = discord.Embed()
+
+            embed.title = "Chess"
+            embed.description = (f"Start a new game between {player.name} and {other_player.name}."
+                                 " Players, please respond below.")
+
+            for response in responses.values():
+                embed.add_field(
+                    name=f"{response['name']}",
+                    value=response.get("response", default_response))
+
+            return embed
+
+        embed = update_embed()
+        message = await ctx.send(mention, embed=embed)
+
+        # yes / no reaction options
+        start_adding_reactions(message, ReactionPredicate.YES_OR_NO_EMOJIS)
+
+        pred = ReactionPredicate.yes_or_no(message)
+        try:
+            while users:
+                # wait for anyone to respond
+                _reaction, user = await ctx.bot.wait_for("reaction_add", check=pred, timeout=600)
+
+                if user.id in users:
+                    if pred.result:
+                        users.remove(user.id)
+
+                        responses[user.id]["response"] = "Has accepted!"
+
+                        embed = update_embed()
+                        await message.edit(embed=embed)
+                    else:
+                        default_response = "The other player declined, no response required"
+                        responses[user.id]["response"] = "Has declined!"
+
+                        embed = update_embed()
+                        await message.edit(embed=embed)
+
+                        return
+        except asyncio.TimeoutError:
+            # one of, if not both users did not respond
+            for user in users:
+                responses[user]["response"] = "Did Not Respond! (Timed out)"
+
+            embed = update_embed()
+            await message.edit(embed=embed)
+
+            return
+
+        # game accepted! remove prompted message and start the game
+        await message.delete()
+
+        await self._start_game(ctx, player, other_player, game_name, game_type)
+
+    async def _start_game(self, ctx: commands.Context,
+                          player_black: discord.Member, player_white: discord.Member,
+                          game_name: str = None, game_type: str = None):
         # get games config
         games = await self._get_games(ctx.channel)
         if not games:
             games = {}
-
-        player_black = ctx.author
-        player_white = other_player
 
         # init game_name if not provided
         if not game_name:
@@ -413,3 +496,60 @@ class ChessGame(commands.Cog):
 
         await message.edit(embed=embed)
         await message.clear_reactions()
+
+    @commands.is_owner()
+    @chess.command()
+    async def close(self,
+                    ctx: commands.Context,
+                    game_name: str,
+                    channel: discord.TextChannel = None):
+        """sub command to close a game"""
+
+        embed: discord.Embed = discord.Embed()
+
+        embed.title = "Chess"
+        embed.description = "Close Game"
+
+        if channel is None:
+            channel = ctx.channel
+
+        try:
+            games = await self._get_games(channel)
+        except KeyError:
+            embed.add_field(name="Game does not exist",
+                            value="This game doesn't appear to exist, please check the "
+                            "game list to ensure you are entering it correctly.")
+            await ctx.send(embed=embed)
+            return
+
+        embed.add_field(
+            name=f"Do you really want to delete this game?",
+            value=f"<@{ctx.author.id}> respond below:")
+
+        message = await ctx.send(embed=embed)
+
+        # yes / no reaction options
+        start_adding_reactions(message, ReactionPredicate.YES_OR_NO_EMOJIS)
+
+        pred = ReactionPredicate.yes_or_no(
+            message,
+            ctx.guild.get_member(ctx.author.id))
+        try:
+            await ctx.bot.wait_for("reaction_add", check=pred, timeout=10)
+            if pred.result is True:
+                embed.add_field(
+                    name="Response:",
+                    value="Game closed!")
+                del games[game_name]
+                await self._set_games(ctx.channel, games)
+                await message.edit(embed=embed)
+                await message.clear_reactions()
+            else:
+                embed.add_field(
+                    name="Response:",
+                    value="Close declined!")
+                await message.edit(embed=embed)
+                await message.clear_reactions()
+        except asyncio.TimeoutError:
+            await message.clear_reactions()
+            await message.delete(embed=embed)
