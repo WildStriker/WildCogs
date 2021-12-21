@@ -59,7 +59,7 @@ class ChessGame(commands.Cog):
             name=f"{ctx.author.name} would like to start a game!",
             value=f"<@{other_player.id}> respond below:")
 
-        message = await ctx.send(embed=embed)
+        message = await ctx.send(f"<@{other_player.id}>", embed=embed)
 
         # yes / no reaction options
         start_adding_reactions(message, ReactionPredicate.YES_OR_NO_EMOJIS)
