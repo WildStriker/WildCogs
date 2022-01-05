@@ -55,6 +55,14 @@ class ChessGame(commands.Cog):
         embed.title = "Chess"
         embed.description = "New Game"
 
+        if other_player.bot:
+            bot = other_player
+            embed.add_field(
+                name=f"{bot} is a bot!",
+                value=f"You cannot start a game with a bot.")
+            message = await ctx.send(embed=embed)
+            return 
+
         embed.add_field(
             name=f"{ctx.author.name} would like to start a game!",
             value=f"<@{other_player.id}> respond below:")
