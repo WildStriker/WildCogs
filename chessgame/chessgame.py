@@ -1,6 +1,7 @@
 """cog to play chess in discord"""
-import io
 import asyncio
+import io
+import logging
 from typing import Dict
 
 import discord
@@ -14,6 +15,9 @@ from .game import Game, start_help_text
 # type hints
 Games = Dict[str, Game]
 
+LATEST_SCHEMA_VERSION = 1
+
+LOGGER = logging.getLogger("red.wildcogs.chessgame")
 
 class ChessGame(commands.Cog):
     """Cog to Play chess!"""
@@ -25,19 +29,110 @@ class ChessGame(commands.Cog):
         super().__init__()
 
         self._config = Config.get_conf(
-            self, identifier=51314929031968350236701571200827144869558993811)
+            self,
+            identifier=51314929031968350236701571200827144869558993811,
+            force_registration=True)
+
+        # ideally schema_version should default to LATEST_SCHEMA_VERSION
+        # since this did not exist in the initial version this will be set to 0
+        # until support is removed (_run_migration_v1)
+        self._config.register_global(schema_version=0)
+
+        self._config.register_channel(games={})
+
+        # for initialization functionality
+        self._ready = asyncio.Event()
+        self._init_task = None
+        self._ready_raised = False
+
+    def create_init_task(self):
+        """creates initialize async task"""
+        def _done_callback(task):
+            """handles error occurence"""
+            exc_info = task.exception()
+            if exc_info is not None:
+                LOGGER.error(
+                    "An unexpected error occured during ChessGame's initialization",
+                    exc_info=exc_info
+                    )
+                self._ready_raised = True
+            self._ready.set()
+
+        self._init_task = asyncio.create_task(self.initialize())
+        self._init_task.add_done_callback(_done_callback)
+
+    async def initialize(self):
+        """run any async tasks here before cog is ready for use"""
+        await self._run_migrations()
+        self._ready.set()
+
+    def cog_unload(self):
+        """clean up when cog is unloaded"""
+        if self._init_task is not None:
+            self._init_task.cancel()
+
+    async def cog_before_invoke(self, ctx):
+        """wait until cog is ready before running commands"""
+        async with ctx.typing():
+            await self._ready.wait()
+        if self._ready_raised:
+            await ctx.send(
+                "There was an error during ChessGame's initialization."
+                " Check logs for > more information."
+                )
+            raise commands.CheckFailure()
+
+    async def _run_migrations(self):
+        """run migrations on existig data required for this cog to work"""
+        schema_version = await self._config.schema_version()
+
+        # no updates required
+        if schema_version == LATEST_SCHEMA_VERSION:
+            return
+
+        LOGGER.info("Running required migrations")
+        migrations = [
+            self._run_migration_v1,
+        ]
+        while schema_version < LATEST_SCHEMA_VERSION:
+            schema_version += 1
+            LOGGER.info("Running migration_v%s", schema_version)
+            await migrations[schema_version - 1]()
+            await self._config.schema_version.set(schema_version)
+        LOGGER.info("Migration completed")
+
+    async def _run_migration_v1(self):
+        channels = await self._config.all_channels()
+
+        for channel, data in channels.items():
+            old_games = jsonpickle.decode(data["games"])
+
+            new_games = {}
+            for key, game in old_games.items():
+                new_games[key] = jsonpickle.encode(game)
+
+            await self._config.channel_from_id(channel).games.set(new_games)
 
     async def _get_games(self, channel) -> Games:
-        games_json = await self._config.channel(channel).games()
-        if games_json:
-            games = jsonpickle.decode(games_json)
-            return games
-        else:
+        config_games = await self._config.channel(channel).games()
+        if not config_games:
             return None
 
-    async def _set_games(self, channel, games):
-        games_json = jsonpickle.encode(games)
-        await self._config.channel(channel).games.set(games_json)
+        games = {}
+        for game_name in config_games:
+            game = jsonpickle.decode(config_games[game_name])
+            games[game_name] = game
+
+        return games
+
+    async def _get_game(self, channel, game_name: str) -> Game:
+        game_json = await self._config.channel(channel).games.get_raw(game_name)
+        game = jsonpickle.decode(game_json)
+        return game
+
+    async def _set_game(self, channel, game_name: str, game: Game):
+        game_json = jsonpickle.encode(game)
+        await self._config.channel(channel).games.set_raw(game_name, value=game_json)
 
     @commands.group()
     async def chess(self, ctx: commands.Context):
@@ -188,7 +283,7 @@ class ChessGame(commands.Cog):
                           player_black: discord.Member, player_white: discord.Member,
                           game_name: str = None, game_type: str = None):
         # get games config
-        games = await self._get_games(ctx.channel)
+        games = await self._config.channel(ctx.channel).games()
         if not games:
             games = {}
 
@@ -199,7 +294,7 @@ class ChessGame(commands.Cog):
         # make game_name unique if already exists
         count = 0
         suffix = ''
-        while game_name + suffix in games.keys():
+        while game_name + suffix in games:
             count += 1
             suffix = f'{count}'
 
@@ -216,9 +311,7 @@ class ChessGame(commands.Cog):
             await ctx.send(embed=embed)
             return
 
-        games[game_name] = game
-
-        await self._set_games(ctx.channel, games)
+        await self._set_game(ctx.channel, game_name, game)
 
         embed: discord.Embed = discord.Embed()
         embed.title = "Chess"
@@ -313,8 +406,7 @@ class ChessGame(commands.Cog):
         embed.description = f"Game: {game_name}"
 
         try:
-            games = await self._get_games(ctx.channel)
-            game = games[game_name]
+            game = await self._get_game(ctx.channel, game_name)
         except KeyError:
             # this game doesn't exist
             embed.add_field(name="Game does not exist",
@@ -351,10 +443,12 @@ class ChessGame(commands.Cog):
                 f"{player_turn.name}'s ({turn_color}'s) Turn"
 
             if is_game_over:
-                del games[game_name]
+                await self._config.channel(ctx.channel).games.clear_raw(game_name)
                 embed.add_field(
                     name="Game Over!",
                     value="Match is over! Start a new game if you want to play again.")
+            else:
+                await self._set_game(ctx.channel, game_name, game)
 
             embed.add_field(name=name_move,
                             value=value_move)
@@ -377,8 +471,6 @@ class ChessGame(commands.Cog):
                     value='To end this game now use "[p]chess draw claim" with:' +
                     fifty_moves +
                     threefold_repetition)
-
-            await self._set_games(ctx.channel, games)
 
             await self._display_board(ctx, mention, embed, game)
         elif player_next == ctx.author:
@@ -410,8 +502,7 @@ class ChessGame(commands.Cog):
         embed.description = "Claim Draw"
 
         try:
-            games = await self._get_games(ctx.channel)
-            game = games[game_name]
+            game = await self._get_game(ctx.channel, game_name)
         except KeyError:
             embed.add_field(name="Game does not exist",
                             value="This game doesn't appear to exist, please check the "
@@ -424,15 +515,13 @@ class ChessGame(commands.Cog):
                 name=f'Draw! - {claim_type}',
                 value='There are been no captures or pawns moved in the last 50 moves'
             )
-            del games[game_name]
-            await self._set_games(ctx.channel, games)
+            await self._config.channel(ctx.channel).games.clear_raw(game_name)
         elif self._threefold_repetition == claim_type and game.can_claim_threefold_repetition:
             embed.add_field(
                 name=f'Draw! - {claim_type}',
                 value='Position has occured five times'
             )
-            del games[game_name]
-            await self._set_games(ctx.channel, games)
+            await self._config.channel(ctx.channel).games.clear_raw(game_name)
         else:
             embed.add_field(
                 name=claim_type,
@@ -452,8 +541,7 @@ class ChessGame(commands.Cog):
         embed.description = "Offer Draw"
 
         try:
-            games = await self._get_games(ctx.channel)
-            game = games[game_name]
+            game = await self._get_game(ctx.channel, game_name)
         except KeyError:
             embed.add_field(name="Game does not exist",
                             value="This game doesn't appear to exist, please check the "
@@ -491,8 +579,7 @@ class ChessGame(commands.Cog):
                 embed.add_field(
                     name="Response:",
                     value="Draw accepted!")
-                del games[game_name]
-                await self._set_games(ctx.channel, games)
+                await self._config.channel(ctx.channel).games.clear_raw(game_name)
             else:
                 embed.add_field(
                     name="Response:",
@@ -522,7 +609,7 @@ class ChessGame(commands.Cog):
             channel = ctx.channel
 
         try:
-            games = await self._get_games(channel)
+            _game = await self._config.channel(ctx.channel).games.get_raw(game_name)
         except KeyError:
             embed.add_field(name="Game does not exist",
                             value="This game doesn't appear to exist, please check the "
@@ -548,8 +635,7 @@ class ChessGame(commands.Cog):
                 embed.add_field(
                     name="Response:",
                     value="Game closed!")
-                del games[game_name]
-                await self._set_games(ctx.channel, games)
+                await self._config.channel(ctx.channel).games.clear_raw(game_name)
                 await message.edit(embed=embed)
                 await message.clear_reactions()
             else:

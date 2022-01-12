@@ -4,4 +4,7 @@ from .chessgame import ChessGame
 
 def setup(bot):
     """add cog to bot collection"""
-    bot.add_cog(ChessGame())
+    cog = ChessGame()
+    bot.add_cog(cog)
+    cog.create_init_task()
+
