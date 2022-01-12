@@ -651,4 +651,4 @@ class ChessGame(commands.Cog):
                 await message.clear_reactions()
         except asyncio.TimeoutError:
             await message.clear_reactions()
-            await message.delete(embed=embed)
+            await message.delete()
