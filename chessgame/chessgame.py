@@ -19,6 +19,7 @@ LATEST_SCHEMA_VERSION = 1
 
 LOGGER = logging.getLogger("red.wildcogs.chessgame")
 
+
 class ChessGame(commands.Cog):
     """Cog to Play chess!"""
 
@@ -54,7 +55,7 @@ class ChessGame(commands.Cog):
                 LOGGER.error(
                     "An unexpected error occured during ChessGame's initialization",
                     exc_info=exc_info
-                    )
+                )
                 self._ready_raised = True
             self._ready.set()
 
@@ -79,7 +80,7 @@ class ChessGame(commands.Cog):
             await ctx.send(
                 "There was an error during ChessGame's initialization."
                 " Check logs for > more information."
-                )
+            )
             raise commands.CheckFailure()
 
     async def _run_migrations(self):
@@ -154,9 +155,9 @@ class ChessGame(commands.Cog):
             bot = other_player
             embed.add_field(
                 name=f"{bot} is a bot!",
-                value=f"You cannot start a game with a bot.")
+                value="You cannot start a game with a bot.")
             message = await ctx.send(embed=embed)
-            return 
+            return
 
         embed.add_field(
             name=f"{ctx.author.name} would like to start a game!",
@@ -289,7 +290,7 @@ class ChessGame(commands.Cog):
 
         # init game_name if not provided
         if not game_name:
-            game_name = f'game'
+            game_name = 'game'
 
         # make game_name unique if already exists
         count = 0
@@ -324,7 +325,11 @@ class ChessGame(commands.Cog):
 
         await self._display_board(ctx, f"<@{player_white.id}>", embed, game)
 
-    async def _display_board(self, ctx: commands.Context, content: str, embed: discord.Embed, game: Game):
+    async def _display_board(self,
+                             ctx: commands.Context,
+                             content: str,
+                             embed: discord.Embed,
+                             game: Game):
         """displays the game board"""
         board_image = io.BytesIO(game.get_board_image())
         embed.set_image(url="attachment://board.png")
@@ -618,7 +623,7 @@ class ChessGame(commands.Cog):
             return
 
         embed.add_field(
-            name=f"Do you really want to delete this game?",
+            name="Do you really want to delete this game?",
             value=f"<@{ctx.author.id}> respond below:")
 
         message = await ctx.send(embed=embed)
