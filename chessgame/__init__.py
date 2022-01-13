@@ -7,4 +7,3 @@ def setup(bot):
     cog = ChessGame()
     bot.add_cog(cog)
     cog.create_init_task()
-
