@@ -3,7 +3,7 @@ import logging
 
 from redbot.core import Config, commands
 
-from .commands import MainCommands, PlayerCommands
+from .commands import MainCommands, PlayerCommands, ScoreboardCommands
 from .migrate import Migrate
 from .startup import StartUp
 from .util import Util
@@ -16,7 +16,8 @@ class ChessGame(commands.Cog,
                 Migrate,
                 Util,
                 MainCommands,
-                PlayerCommands):
+                PlayerCommands,
+                ScoreboardCommands):
     """Cog to Play chess!"""
 
     def __init__(self):
@@ -31,6 +32,8 @@ class ChessGame(commands.Cog,
         # since this did not exist in the initial version this will be set to 0
         # until support is removed (_run_migration_v1)
         self._config.register_global(schema_version=0)
+
+        self._config.register_guild(scoreboard={})
 
         self._config.register_channel(games={})
 

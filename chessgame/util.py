@@ -1,7 +1,7 @@
 """module contains helper functions used across other modules"""
 
 import io
-from typing import Dict
+from typing import Dict, Union
 
 import discord
 import jsonpickle
@@ -35,6 +35,31 @@ class Util:
     async def _set_game(self, channel, game_name: str, game: Game):
         game_json = jsonpickle.encode(game)
         await self._config.channel(channel).games.set_raw(game_name, value=game_json)
+
+    async def _increment_score(self,
+                               guild,
+                               player_id: Union[int, str],
+                               elo: int,
+                               wins: int,
+                               losses: int,
+                               ties: int):
+        player_id = str(player_id)
+        async with self._config.guild(guild).scoreboard() as scoreboard:
+            if player_id in scoreboard:
+                player_score = scoreboard[player_id]
+                player_score["elo"] += elo
+                player_score["wins"] += wins
+                player_score["losses"] += losses
+                player_score["ties"] += ties
+            else:
+                player_score = {
+                    "elo": elo,
+                    "wins": wins,
+                    "losses": losses,
+                    "ties": ties
+                }
+
+            scoreboard[player_id] = player_score
 
     async def _start_game(self, ctx: commands.Context,
                           player_black: discord.Member, player_white: discord.Member,

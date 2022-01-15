@@ -1,6 +1,7 @@
 
 """module contains logic for game related commands"""
 import asyncio
+import math
 
 import discord
 from redbot.core import commands
@@ -111,7 +112,7 @@ class PlayerCommands:
         if player_turn == ctx.author:
             # it is their turn
             try:
-                is_game_over, mention, value_move = game.move_piece(move)
+                move_result = game.move_piece(move)
             except ValueError:
                 embed.add_field(name="Invalid Move Taken!",
                                 value=f"'{move}' isn't a valid move, try again.")
@@ -121,8 +122,20 @@ class PlayerCommands:
             name_move = f"Move: {game.total_moves} - " \
                 f"{player_turn.name}'s ({turn_color}'s) Turn"
 
-            if is_game_over:
-                await self._config.channel(ctx.channel).games.clear_raw(game_name)
+            if move_result.is_game_over:
+                if move_result.winner_id:
+                    await self._finish_game(ctx,
+                                            game_name,
+                                            False,
+                                            move_result.winner_id,
+                                            move_result.loser_id)
+                else:
+                    await self._finish_game(ctx,
+                                            game_name,
+                                            True,
+                                            player_turn,
+                                            player_next)
+
                 embed.add_field(
                     name="Game Over!",
                     value="Match is over! Start a new game if you want to play again.")
@@ -130,7 +143,7 @@ class PlayerCommands:
                 await self._set_game(ctx.channel, game_name, game)
 
             embed.add_field(name=name_move,
-                            value=value_move)
+                            value=move_result.message)
 
             # show if can claim draw
             if game.can_claim_draw:
@@ -151,7 +164,7 @@ class PlayerCommands:
                     fifty_moves +
                     threefold_repetition)
 
-            await self._display_board(ctx, mention, embed, game)
+            await self._display_board(ctx, move_result.mention, embed, game)
         elif player_next == ctx.author:
             # not their turn yet
             embed.add_field(name=f"{player_next.name} - not your turn",
@@ -194,13 +207,21 @@ class PlayerCommands:
                 name=f'Draw! - {claim_type}',
                 value='There are been no captures or pawns moved in the last 50 moves'
             )
-            await self._config.channel(ctx.channel).games.clear_raw(game_name)
+            await self._finish_game(ctx,
+                                    game_name,
+                                    True,
+                                    game.player_black_id,
+                                    game.player_white_id)
         elif self._threefold_repetition == claim_type and game.can_claim_threefold_repetition:
             embed.add_field(
                 name=f'Draw! - {claim_type}',
                 value='Position has occured five times'
             )
-            await self._config.channel(ctx.channel).games.clear_raw(game_name)
+            await self._finish_game(ctx,
+                                    game_name,
+                                    True,
+                                    game.player_black_id,
+                                    game.player_white_id)
         else:
             embed.add_field(
                 name=claim_type,
@@ -258,7 +279,11 @@ class PlayerCommands:
                 embed.add_field(
                     name="Response:",
                     value="Draw accepted!")
-                await self._config.channel(ctx.channel).games.clear_raw(game_name)
+                await self._finish_game(ctx,
+                                        game_name,
+                                        True,
+                                        game.player_black_id,
+                                        game.player_white_id)
             else:
                 embed.add_field(
                     name="Response:",
@@ -270,3 +295,68 @@ class PlayerCommands:
 
         await message.edit(embed=embed)
         await message.clear_reactions()
+
+    async def _finish_game(self,
+                           ctx: commands.Context,
+                           game_name: str,
+                           is_draw: bool,
+                           player_1: int,
+                           player_2: int):
+        """helper function to close game and update scoreboard when finished
+
+        first player id should be the winner if the game did not end in a draw
+
+        Args:
+            ctx (commands.Context): command context
+            game_name (str): game name that will be removed from config
+            is_draw (bool): True if game ended in a draw
+            player_1 (int): first player id, this is the winner if not a draw
+            player_2 (int): second player id, this is the winner if not a draw
+        """
+        await self._config.channel(ctx.channel).games.clear_raw(game_name)
+
+        # do not update the scoreboard if someone
+        # is just playing against themselves
+        if player_1 == player_2:
+            return
+
+        if is_draw:
+            elo_offset_1, elo_offset_2 = await self._calculate_elo_offset(
+                ctx.guild,
+                player_1,
+                player_2,
+                0.5)
+            await self._increment_score(ctx.guild, player_1, elo_offset_1, 0, 0, 1)
+            await self._increment_score(ctx.guild, player_2, elo_offset_2, 0, 0, 1)
+        else:
+            elo_offset_1, elo_offset_2 = await self._calculate_elo_offset(
+                ctx.guild,
+                player_1,
+                player_2,
+                1)
+            await self._increment_score(ctx.guild, player_1, elo_offset_1, 1, 0, 0)
+            await self._increment_score(ctx.guild, player_2, elo_offset_2, 0, 1, 0)
+
+    async def _calculate_elo_offset(self, guild, player_1, player_2, player_1_score):
+        starting_elo = 1200
+        player_1_elo = await self._config.guild(guild).scoreboard.get_raw(
+            str(player_1),
+            "elo",
+            default=starting_elo)
+        player_2_elo = await self._config.guild(guild).scoreboard.get_raw(
+            str(player_2),
+            "elo",
+            default=starting_elo)
+
+        expected_score_1 = 1 / (1 + math.pow(10,
+                                             (player_2_elo - player_1_elo) / 400))
+        expected_score_2 = 1 - expected_score_1
+
+        k_factor = 32
+
+        player_2_score = 1 - player_1_score
+
+        calculate_1 = k_factor * (player_1_score - expected_score_1)
+        calculate_2 = k_factor * (player_2_score - expected_score_2)
+
+        return round(calculate_1), round(calculate_2)
