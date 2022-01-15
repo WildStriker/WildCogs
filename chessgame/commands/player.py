@@ -100,7 +100,7 @@ class PlayerCommands:
         player_white = ctx.guild.get_member(game.player_white_id)
         player_black = ctx.guild.get_member(game.player_black_id)
 
-        turn_color, player_turn, player_next = game.order
+        turn_color, player_turn, player_next = game.get_order(False)
         # convert ids to members
         if player_turn == game.player_white_id:
             player_turn = player_white

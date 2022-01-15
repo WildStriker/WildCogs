@@ -18,6 +18,43 @@ class MainCommands:
     async def chess(self, ctx: commands.Context):
         """manage chess games"""
 
+    @chess.command(name='show', autohelp=False)
+    async def show_game(self, ctx: commands.Context, game_name: str):
+        """reposts the last gameboard state"""
+        embed: discord.Embed = discord.Embed()
+        embed.title = "Chess"
+        embed.description = f"Game: {game_name}"
+
+        try:
+            game = await self._get_game(ctx.channel, game_name)
+        except ValueError:
+            embed.add_field(name="Game does not exist",
+                            value="This game doesn't appear to exist, please check the "
+                            "game list to ensure you are entering it correctly")
+            await ctx.send(embed=embed)
+            return
+
+        embed.add_field(name="Type:", value=game.type, inline=False)
+
+        turn_color, player_turn, _player_next = game.get_order(True)
+        mention = f"<@{player_turn}>"
+
+        player_turn = ctx.guild.get_member(player_turn)
+
+        if game.total_moves == 0:
+            name_move = "New Game"
+            value = f"<@{player_turn.id}>'s (White's) turn is first"
+        else:
+            name_move = f"Move: {game.total_moves} - " \
+                f"{player_turn.name}'s ({turn_color}'s) Turn"
+            value = f"{mention} you're up next!"
+
+        embed.add_field(name=name_move,
+                        value=value,
+                        inline=False)
+
+        await self._display_board(ctx, mention, embed, game)
+
     @commands.is_owner()
     @chess.command(name='launch', autohelp=False, help=start_help_text())
     async def launch_game(self, ctx: commands.Context,

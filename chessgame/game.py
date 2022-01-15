@@ -85,7 +85,7 @@ class Game:
                                 str - resulting message after move
         """
 
-        _, player_turn, player_next = self.order
+        _, player_turn, player_next = self.get_order(False)
 
         move: chess.Move = self._board.push_san(move)
         self._arrows = [(move.from_square, move.to_square)]
@@ -169,11 +169,13 @@ class Game:
         """total moves taken"""
         return len(self._board.move_stack)
 
-    @property
-    def order(self):
-        """return color, player id turn and player id that is next"""
+    def get_order(self, previous):
+        """return color, player id turn and player id that is next/previously occured"""
+        is_white_turn = self._board.turn == chess.WHITE
+        if previous:
+            is_white_turn = not is_white_turn
 
-        if self._board.turn == chess.WHITE:
+        if is_white_turn:
             return 'White', self.player_white_id, self.player_black_id
         else:
             return 'Black', self.player_black_id, self.player_white_id
