@@ -9,6 +9,7 @@ from redbot.core.utils.menus import start_adding_reactions
 from redbot.core.utils.predicates import ReactionPredicate
 
 from ..game import start_help_text
+from ..constants import DEFAULT_ELO
 from .main import chess
 
 
@@ -338,15 +339,14 @@ class PlayerCommands:
             await self._increment_score(ctx.guild, player_2, elo_offset_2, 0, 1, 0)
 
     async def _calculate_elo_offset(self, guild, player_1, player_2, player_1_score):
-        starting_elo = 1200
         player_1_elo = await self._config.guild(guild).scoreboard.get_raw(
             str(player_1),
             "elo",
-            default=starting_elo)
+            default=DEFAULT_ELO)
         player_2_elo = await self._config.guild(guild).scoreboard.get_raw(
             str(player_2),
             "elo",
-            default=starting_elo)
+            default=DEFAULT_ELO)
 
         expected_score_1 = 1 / (1 + math.pow(10,
                                              (player_2_elo - player_1_elo) / 400))

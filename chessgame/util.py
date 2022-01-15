@@ -7,6 +7,7 @@ import discord
 import jsonpickle
 from redbot.core import commands
 
+from .constants import DEFAULT_ELO
 from .game import Game
 
 # type hints
@@ -53,7 +54,7 @@ class Util:
                 player_score["ties"] += ties
             else:
                 player_score = {
-                    "elo": elo,
+                    "elo": DEFAULT_ELO + elo,
                     "wins": wins,
                     "losses": losses,
                     "ties": ties
