@@ -4,22 +4,23 @@ import asyncio
 import math
 
 import discord
+
 from redbot.core import commands
 from redbot.core.utils.menus import start_adding_reactions
 from redbot.core.utils.predicates import ReactionPredicate
 
-from ..game import start_help_text
 from ..constants import DEFAULT_ELO
+from ..game import start_help_text
 from .main import chess
 
 
-class PlayerCommands:
+class PlayerCommands():
     """Game related commands"""
 
     _fifty_moves = 'Fifty moves'
     _threefold_repetition = 'Threefold repetition'
 
-    @chess.command(name='start', autohelp=False, help=start_help_text())
+    @chess.command(name="start", autohelp=False, help=start_help_text())
     async def start_game(self, ctx: commands.Context,
                          other_player: discord.Member,
                          game_name: str = None, game_type: str = None):
@@ -78,7 +79,7 @@ class PlayerCommands:
 
         await self._start_game(ctx, ctx.author, other_player, game_name, game_type)
 
-    @chess.command(name='move', autohelp=False)
+    @chess.command(name="move", autohelp=False)
     async def move_piece(self, ctx: commands.Context, game_name: str, move: str):
         """move the next game piece, using Standard Algebraic Notation"""
 
@@ -181,7 +182,7 @@ class PlayerCommands:
                             '(White) are able to play in this game")
             await ctx.send(embed=embed)
 
-    @chess.group(name='draw')
+    @chess.group(name="draw")
     async def draw(self, ctx: commands.Context):
         """draw related commands"""
 
@@ -232,7 +233,7 @@ class PlayerCommands:
 
         await ctx.send(embed=embed)
 
-    @draw.group(name='byagreement', autohelp=False)
+    @draw.group(name="byagreement", autohelp=False)
     async def by_agreement(self, ctx: commands.Context, game_name: str):
         """Offer draw by agreement"""
 

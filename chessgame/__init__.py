@@ -1,9 +1,15 @@
 """chess cog init"""
-from .chessgame import ChessGame
+import discord
+
+from .chessgame import ChessGame, StartUp
 
 
-def setup(bot):
+async def setup(bot):
     """add cog to bot collection"""
-    cog = ChessGame()
-    bot.add_cog(cog)
-    cog.create_init_task()
+    cog = ChessGame(bot)
+    if discord.version_info.major >= 2:
+        await bot.add_cog(cog)
+    else:
+        bot.add_cog(cog)
+    cog.startup = StartUp()
+    cog.startup.create_init_task(cog)
