@@ -27,7 +27,8 @@ class ChessGame(commands.Cog,
 
     def __init__(self, bot: Red):
         self.bot: Red = bot
-        self._config: Config = Config.get_conf(
+        super().__init__()
+        self.config: Config = Config.get_conf(
             self,
             identifier=51314929031968350236701571200827144869558993811,
             force_registration=True)
@@ -35,22 +36,22 @@ class ChessGame(commands.Cog,
         # ideally schema_version should default to LATEST_SCHEMA_VERSION
         # since this did not exist in the initial version this will be set to 0
         # until support is removed (_run_migration_v1)
-        self._config.register_global(schema_version=0)
+        self.config.register_global(schema_version=0)
 
-        self._config.register_guild(scoreboard={})
+        self.config.register_guild(scoreboard={})
 
-        self._config.register_channel(games={})
+        self.config.register_channel(games={})
 
     def cog_unload(self):
         """clean up when cog is unloaded"""
-        if self._init_task is not None:
-            self._init_task.cancel()
+        if self.setup._init_task is not None:
+            self.setup._init_task.cancel()
 
     async def cog_before_invoke(self, ctx):
         """wait until cog is ready before running commands"""
         async with ctx.typing():
-            await self.startup._ready.wait()
-        if self.startup._ready_raised:
+            await self.startup.ready.wait()
+        if self.startup.ready_raised:
             await ctx.send(
                 "There was an error during ChessGame's initialization."
                 " Check logs for > more information."
@@ -58,7 +59,7 @@ class ChessGame(commands.Cog,
             raise commands.CheckFailure()
 
     async def _get_games(self, channel) -> Games:
-        config_games = await self._config.channel(channel).games()
+        config_games = await self.config.channel(channel).games()
         if not config_games:
             return None
 
@@ -70,19 +71,19 @@ class ChessGame(commands.Cog,
         return games
 
     async def _get_game(self, channel, game_name: str) -> Game:
-        game_json = await self._config.channel(channel).games.get_raw(game_name)
+        game_json = await self.config.channel(channel).games.get_raw(game_name)
         game = jsonpickle.decode(game_json)
         return game
 
     async def _set_game(self, channel, game_name: str, game: Game):
         game_json = jsonpickle.encode(game)
-        await self._config.channel(channel).games.set_raw(game_name, value=game_json)
+        await self.config.channel(channel).games.set_raw(game_name, value=game_json)
 
     async def _start_game(self, ctx: commands.Context,
                           player_black: discord.Member, player_white: discord.Member,
                           game_name: str = None, game_type: str = None):
         # get games config
-        games = await self._config.channel(ctx.channel).games()
+        games = await self.config.channel(ctx.channel).games()
         if not games:
             games = {}
 
@@ -141,7 +142,7 @@ class ChessGame(commands.Cog,
                                losses: int,
                                ties: int):
         player_id = str(player_id)
-        async with self._config.guild(guild).scoreboard() as scoreboard:
+        async with self.config.guild(guild).scoreboard() as scoreboard:
             if player_id in scoreboard:
                 player_score = scoreboard[player_id]
                 player_score["elo"] += elo
@@ -158,15 +159,15 @@ class ChessGame(commands.Cog,
 
             scoreboard[player_id] = player_score
 
-class StartUp():
+class StartUp:
     """handles ChessGame's initialization"""
 
     def __init__(self):
         self.cog = None
         # for initialization functionality
-        self._ready = asyncio.Event()
+        self.ready = asyncio.Event()
         self._init_task = None
-        self._ready_raised = False
+        self.ready_raised = False
 
     def create_init_task(self, cog: commands.Cog):
         """creates initialize async task"""
@@ -179,8 +180,8 @@ class StartUp():
                     "An unexpected error occured during ChessGame's initialization",
                     exc_info=exc_info
                 )
-                self._ready_raised = True
-            self._ready.set()
+                self.ready_raised = True
+            self.ready.set()
 
         self._init_task = asyncio.create_task(self.initialize())
         self._init_task.add_done_callback(_done_callback)
@@ -188,11 +189,11 @@ class StartUp():
     async def initialize(self):
         """run any async tasks here before cog is ready for use"""
         await self._run_migrations()
-        self._ready.set()
+        self.ready.set()
 
     async def _run_migrations(self):
         """run migrations on existig data required for this cog to work"""
-        schema_version = await self.cog._config.schema_version()
+        schema_version = await self.cog.config.schema_version()
 
         # no updates required
         if schema_version == LATEST_SCHEMA_VERSION:
@@ -206,11 +207,11 @@ class StartUp():
             schema_version += 1
             LOGGER.info("Running migration_v%s", schema_version)
             await migrations[schema_version - 1]()
-            await self.cog._config.schema_version.set(schema_version)
+            await self.cog.config.schema_version.set(schema_version)
         LOGGER.info("Migration completed")
 
     async def _run_migration_v1(self):
-        channels = await self.cog._config.all_channels()
+        channels = await self.cog.config.all_channels()
 
         for channel, data in channels.items():
             old_games = jsonpickle.decode(data["games"])
@@ -219,4 +220,4 @@ class StartUp():
             for key, game in old_games.items():
                 new_games[key] = jsonpickle.encode(game)
 
-            await self.cog._config.channel_from_id(channel).games.set(new_games)
+            await self.cog.config.channel_from_id(channel).games.set(new_games)

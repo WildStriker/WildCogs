@@ -11,8 +11,7 @@ from redbot.core.utils.predicates import ReactionPredicate
 
 from ..game import start_help_text
 
-
-class MainCommands():
+class MainCommands:
     """Main Command
 
     contains root command, as well as any other not grouped by function"""
@@ -224,7 +223,7 @@ class MainCommands():
             channel = ctx.channel
 
         try:
-            game = await self._config.channel(ctx.channel).games.get_raw(game_name)
+            game = await self.config.channel(ctx.channel).games.get_raw(game_name)
         except KeyError:
             embed.add_field(name="Game does not exist",
                             value="This game doesn't appear to exist, please check the "
@@ -251,7 +250,7 @@ class MainCommands():
                     embed.add_field(
                         name="Response:",
                         value="Game closed!")
-                    await self._config.channel(ctx.channel).games.clear_raw(game_name)
+                    await self.config.channel(ctx.channel).games.clear_raw(game_name)
                     await message.edit(embed=embed)
                     await message.clear_reactions()
                 else:
@@ -264,7 +263,7 @@ class MainCommands():
                 await message.clear_reactions()
                 await message.delete()
         else:
-            await self._config.channel(ctx.channel).games.clear_raw(game_name)
+            await self.config.channel(ctx.channel).games.clear_raw(game_name)
             embed.add_field(
                 name="Response:",
                 value=f"Game closed!")

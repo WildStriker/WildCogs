@@ -13,8 +13,7 @@ from ..constants import DEFAULT_ELO
 from ..game import start_help_text
 from .main import chess
 
-
-class PlayerCommands():
+class PlayerCommands:
     """Game related commands"""
 
     _fifty_moves = 'Fifty moves'
@@ -315,7 +314,7 @@ class PlayerCommands():
             player_1 (int): first player id, this is the winner if not a draw
             player_2 (int): second player id, this is the winner if not a draw
         """
-        await self._config.channel(ctx.channel).games.clear_raw(game_name)
+        await self.config.channel(ctx.channel).games.clear_raw(game_name)
 
         # do not update the scoreboard if someone
         # is just playing against themselves
@@ -340,11 +339,11 @@ class PlayerCommands():
             await self._increment_score(ctx.guild, player_2, elo_offset_2, 0, 1, 0)
 
     async def _calculate_elo_offset(self, guild, player_1, player_2, player_1_score):
-        player_1_elo = await self._config.guild(guild).scoreboard.get_raw(
+        player_1_elo = await self.config.guild(guild).scoreboard.get_raw(
             str(player_1),
             "elo",
             default=DEFAULT_ELO)
-        player_2_elo = await self._config.guild(guild).scoreboard.get_raw(
+        player_2_elo = await self.config.guild(guild).scoreboard.get_raw(
             str(player_2),
             "elo",
             default=DEFAULT_ELO)

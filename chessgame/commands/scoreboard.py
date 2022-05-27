@@ -12,8 +12,7 @@ from redbot.core.utils.predicates import ReactionPredicate
 
 from .main import chess
 
-
-class ScoreboardCommands():
+class ScoreboardCommands:
     """Scoreboard related commands"""
 
     @chess.group(name="scoreboard")
@@ -30,7 +29,7 @@ class ScoreboardCommands():
         max_characters = 26
         output_start = "```Rank Player    (elo) W-L-T"
 
-        scoreboard = await self._config.guild(ctx.guild).scoreboard()
+        scoreboard = await self.config.guild(ctx.guild).scoreboard()
         total_players = len(scoreboard)
 
         if sort_by not in {"elo", "wins", "losses", "ties"}:
@@ -117,7 +116,7 @@ class ScoreboardCommands():
         """find a player's score. If none is provided this will look for the requester's score"""
 
         try:
-            score = await self._config.guild(ctx.guild).scoreboard.get_raw(str(player.id))
+            score = await self.config.guild(ctx.guild).scoreboard.get_raw(str(player.id))
             info = (f"__{player.name}__\n```"
                     f"ELO: {score['elo']}\n"
                     f"WINS: {score['wins']}\n"
@@ -148,11 +147,11 @@ class ScoreboardCommands():
                         ties: int):
         """allows bot owner to increment (decrement if negative value passed) a player's score"""
         try:
-            old_score = await self._config.guild(ctx.guild).scoreboard.get_raw(str(player.id))
+            old_score = await self.config.guild(ctx.guild).scoreboard.get_raw(str(player.id))
         except KeyError:
             old_score = {}
         await self._increment_score(ctx.guild, player.id, elo, wins, losses, ties)
-        new_score = await self._config.guild(ctx.guild).scoreboard.get_raw(str(player.id))
+        new_score = await self.config.guild(ctx.guild).scoreboard.get_raw(str(player.id))
 
         info = (f"__{player.name}__\n```"
                 f"ELO: {old_score.get('elo', 'N/A')} -> {new_score['elo']}\n"
@@ -204,7 +203,7 @@ class ScoreboardCommands():
                 embed.add_field(
                     name="Response:",
                     value="Scoreboard has been completely cleared.")
-                await self._config.guild(ctx.guild).scoreboard.clear()
+                await self.config.guild(ctx.guild).scoreboard.clear()
             else:
                 embed.add_field(
                     name="Response:",
@@ -256,7 +255,7 @@ class ScoreboardCommands():
                 embed.add_field(
                     name="Response:",
                     value="Score has been removed.")
-                await self._config.guild(ctx.guild).scoreboard.clear_raw(str(player_id))
+                await self.config.guild(ctx.guild).scoreboard.clear_raw(str(player_id))
             else:
                 embed.add_field(
                     name="Response:",
