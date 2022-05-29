@@ -1,6 +1,7 @@
 """Main command module
 """
 import asyncio
+import typing
 
 import discord
 from redbot.core import commands
@@ -209,7 +210,8 @@ class MainCommands:
     async def close(self,
                     ctx: commands.Context,
                     game_name: str,
-                    channel: discord.TextChannel = None):
+                    channel: typing.Optional[discord.TextChannel] = None,
+                    no_confirmation: typing.Optional[bool] = False):
         """sub command to close a game"""
 
         embed: discord.Embed = discord.Embed()
@@ -220,45 +222,50 @@ class MainCommands:
         if channel is None:
             channel = ctx.channel
 
-        try:
-            _game = await self._config.channel(ctx.channel).games.get_raw(game_name)
-        except KeyError:
+        if game_name not in await self.config.channel(ctx.channel).games():
             embed.add_field(name="Game does not exist",
                             value="This game doesn't appear to exist, please check the "
                             "game list to ensure you are entering it correctly.")
             await ctx.send(embed=embed)
             return
 
-        embed.add_field(
-            name="Do you really want to delete this game?",
-            value=f"<@{ctx.author.id}> respond below:")
+        if not no_confirmation:
+            embed.add_field(
+                name="Do you really want to delete this game?",
+                value=f"<@{ctx.author.id}> respond below:")
 
-        message = await ctx.send(embed=embed)
+            message = await ctx.send(embed=embed)
 
-        # yes / no reaction options
-        start_adding_reactions(message, ReactionPredicate.YES_OR_NO_EMOJIS)
+            # yes / no reaction options
+            start_adding_reactions(message, ReactionPredicate.YES_OR_NO_EMOJIS)
 
-        pred = ReactionPredicate.yes_or_no(
-            message,
-            ctx.guild.get_member(ctx.author.id))
-        try:
-            await ctx.bot.wait_for("reaction_add", check=pred, timeout=10)
-            if pred.result is True:
-                embed.add_field(
-                    name="Response:",
-                    value="Game closed!")
-                await self._config.channel(ctx.channel).games.clear_raw(game_name)
-                await message.edit(embed=embed)
+            pred = ReactionPredicate.yes_or_no(
+                message,
+                ctx.guild.get_member(ctx.author.id))
+            try:
+                await ctx.bot.wait_for("reaction_add", check=pred, timeout=10)
+                if pred.result is True:
+                    embed.add_field(
+                        name="Response:",
+                        value="Game closed!")
+                    await self.config.channel(ctx.channel).games.clear_raw(game_name)
+                    await message.edit(embed=embed)
+                    await message.clear_reactions()
+                else:
+                    embed.add_field(
+                        name="Response:",
+                        value="Close declined!")
+                    await message.edit(embed=embed)
+                    await message.clear_reactions()
+            except asyncio.TimeoutError:
                 await message.clear_reactions()
-            else:
-                embed.add_field(
-                    name="Response:",
-                    value="Close declined!")
-                await message.edit(embed=embed)
-                await message.clear_reactions()
-        except asyncio.TimeoutError:
-            await message.clear_reactions()
-            await message.delete()
+                await message.delete()
+        else:
+            await self.config.channel(ctx.channel).games.clear_raw(game_name)
+            embed.add_field(
+                name="Response:",
+                value="Game closed!")
+            await ctx.send(embed=embed)
 
 
 # for conveniently making group available to other command classes

@@ -8,8 +8,8 @@ from redbot.core import commands
 from redbot.core.utils.menus import start_adding_reactions
 from redbot.core.utils.predicates import ReactionPredicate
 
-from ..game import start_help_text
 from ..constants import DEFAULT_ELO
+from ..game import start_help_text
 from .main import chess
 
 
@@ -19,7 +19,7 @@ class PlayerCommands:
     _fifty_moves = 'Fifty moves'
     _threefold_repetition = 'Threefold repetition'
 
-    @chess.command(name='start', autohelp=False, help=start_help_text())
+    @chess.command(name="start", autohelp=False, help=start_help_text())
     async def start_game(self, ctx: commands.Context,
                          other_player: discord.Member,
                          game_name: str = None, game_type: str = None):
@@ -78,7 +78,7 @@ class PlayerCommands:
 
         await self._start_game(ctx, ctx.author, other_player, game_name, game_type)
 
-    @chess.command(name='move', autohelp=False)
+    @chess.command(name="move", autohelp=False)
     async def move_piece(self, ctx: commands.Context, game_name: str, move: str):
         """move the next game piece, using Standard Algebraic Notation"""
 
@@ -181,7 +181,7 @@ class PlayerCommands:
                             '(White) are able to play in this game")
             await ctx.send(embed=embed)
 
-    @chess.group(name='draw')
+    @chess.group(name="draw")
     async def draw(self, ctx: commands.Context):
         """draw related commands"""
 
@@ -232,7 +232,7 @@ class PlayerCommands:
 
         await ctx.send(embed=embed)
 
-    @draw.group(name='byagreement', autohelp=False)
+    @draw.group(name="byagreement", autohelp=False)
     async def by_agreement(self, ctx: commands.Context, game_name: str):
         """Offer draw by agreement"""
 
@@ -314,7 +314,7 @@ class PlayerCommands:
             player_1 (int): first player id, this is the winner if not a draw
             player_2 (int): second player id, this is the winner if not a draw
         """
-        await self._config.channel(ctx.channel).games.clear_raw(game_name)
+        await self.config.channel(ctx.channel).games.clear_raw(game_name)
 
         # do not update the scoreboard if someone
         # is just playing against themselves
@@ -339,11 +339,11 @@ class PlayerCommands:
             await self._increment_score(ctx.guild, player_2, elo_offset_2, 0, 1, 0)
 
     async def _calculate_elo_offset(self, guild, player_1, player_2, player_1_score):
-        player_1_elo = await self._config.guild(guild).scoreboard.get_raw(
+        player_1_elo = await self.config.guild(guild).scoreboard.get_raw(
             str(player_1),
             "elo",
             default=DEFAULT_ELO)
-        player_2_elo = await self._config.guild(guild).scoreboard.get_raw(
+        player_2_elo = await self.config.guild(guild).scoreboard.get_raw(
             str(player_2),
             "elo",
             default=DEFAULT_ELO)
