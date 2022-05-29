@@ -266,8 +266,9 @@ class MainCommands:
             await self.config.channel(ctx.channel).games.clear_raw(game_name)
             embed.add_field(
                 name="Response:",
-                value=f"Game closed!")
+                value="Game closed!")
             await ctx.send(embed=embed)
+
 
 # for conveniently making group available to other command classes
 chess = MainCommands.chess

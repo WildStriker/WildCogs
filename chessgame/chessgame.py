@@ -44,8 +44,8 @@ class ChessGame(commands.Cog,
 
     def cog_unload(self):
         """clean up when cog is unloaded"""
-        if self.setup._init_task is not None:
-            self.setup._init_task.cancel()
+        if self.startup._init_task is not None:
+            self.startup._init_task.cancel()
 
     async def cog_before_invoke(self, ctx):
         """wait until cog is ready before running commands"""
@@ -159,6 +159,7 @@ class ChessGame(commands.Cog,
 
             scoreboard[player_id] = player_score
 
+
 class StartUp:
     """handles ChessGame's initialization"""
 
@@ -166,7 +167,7 @@ class StartUp:
         self.cog = None
         # for initialization functionality
         self.ready = asyncio.Event()
-        self._init_task = None
+        self.init_task = None
         self.ready_raised = False
 
     def create_init_task(self, cog: commands.Cog):
@@ -183,8 +184,8 @@ class StartUp:
                 self.ready_raised = True
             self.ready.set()
 
-        self._init_task = asyncio.create_task(self.initialize())
-        self._init_task.add_done_callback(_done_callback)
+        self.init_task = asyncio.create_task(self.initialize())
+        self.init_task.add_done_callback(_done_callback)
 
     async def initialize(self):
         """run any async tasks here before cog is ready for use"""
