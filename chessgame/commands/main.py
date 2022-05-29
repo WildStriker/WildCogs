@@ -4,12 +4,12 @@ import asyncio
 import typing
 
 import discord
-
 from redbot.core import commands
 from redbot.core.utils.menus import start_adding_reactions
 from redbot.core.utils.predicates import ReactionPredicate
 
 from ..game import start_help_text
+
 
 class MainCommands:
     """Main Command
@@ -210,8 +210,8 @@ class MainCommands:
     async def close(self,
                     ctx: commands.Context,
                     game_name: str,
-                    channel: typing.Optional[discord.TextChannel]=None,
-                    no_confirmation: typing.Optional[bool]=False):
+                    channel: typing.Optional[discord.TextChannel] = None,
+                    no_confirmation: typing.Optional[bool] = False):
         """sub command to close a game"""
 
         embed: discord.Embed = discord.Embed()

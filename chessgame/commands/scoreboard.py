@@ -5,12 +5,13 @@ import math
 from typing import Union
 
 import discord
-
 from redbot.core import commands
-from redbot.core.utils.menus import DEFAULT_CONTROLS, menu, start_adding_reactions
+from redbot.core.utils.menus import (DEFAULT_CONTROLS, menu,
+                                     start_adding_reactions)
 from redbot.core.utils.predicates import ReactionPredicate
 
 from .main import chess
+
 
 class ScoreboardCommands:
     """Scoreboard related commands"""

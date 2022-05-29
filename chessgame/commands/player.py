@@ -4,7 +4,6 @@ import asyncio
 import math
 
 import discord
-
 from redbot.core import commands
 from redbot.core.utils.menus import start_adding_reactions
 from redbot.core.utils.predicates import ReactionPredicate
@@ -12,6 +11,7 @@ from redbot.core.utils.predicates import ReactionPredicate
 from ..constants import DEFAULT_ELO
 from ..game import start_help_text
 from .main import chess
+
 
 class PlayerCommands:
     """Game related commands"""

@@ -6,9 +6,7 @@ from typing import Dict, Union
 
 import discord
 import jsonpickle
-
 from redbot.core import Config, commands
-from redbot.core.bot import Red
 
 from .commands import MainCommands, PlayerCommands, ScoreboardCommands
 from .constants import DEFAULT_ELO, LATEST_SCHEMA_VERSION
@@ -19,15 +17,16 @@ LOGGER = logging.getLogger("red.wildcogs.chessgame")
 # type hints
 Games = Dict[str, Game]
 
+
 class ChessGame(commands.Cog,
                 MainCommands,
                 PlayerCommands,
                 ScoreboardCommands):
     """Cog to Play chess!"""
 
-    def __init__(self, bot: Red):
-        self.bot: Red = bot
+    def __init__(self):
         super().__init__()
+
         self.config: Config = Config.get_conf(
             self,
             identifier=51314929031968350236701571200827144869558993811,
@@ -44,8 +43,8 @@ class ChessGame(commands.Cog,
 
     def cog_unload(self):
         """clean up when cog is unloaded"""
-        if self.startup._init_task is not None:
-            self.startup._init_task.cancel()
+        if self.startup.init_task is not None:
+            self.startup.init_task.cancel()
 
     async def cog_before_invoke(self, ctx):
         """wait until cog is ready before running commands"""
@@ -173,6 +172,7 @@ class StartUp:
     def create_init_task(self, cog: commands.Cog):
         """creates initialize async task"""
         self.cog = cog
+
         def _done_callback(task):
             """handles error occurence"""
             exc_info = task.exception()

@@ -6,7 +6,7 @@ from .chessgame import ChessGame, StartUp
 
 async def setup(bot):
     """add cog to bot collection"""
-    cog = ChessGame(bot)
+    cog = ChessGame()
     if discord.version_info.major >= 2:
         await bot.add_cog(cog)
     else:
