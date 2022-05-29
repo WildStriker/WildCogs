@@ -222,9 +222,7 @@ class MainCommands:
         if channel is None:
             channel = ctx.channel
 
-        try:
-            game = await self.config.channel(ctx.channel).games.get_raw(game_name)
-        except KeyError:
+        if game_name not in await self.config.channel(ctx.channel).games():
             embed.add_field(name="Game does not exist",
                             value="This game doesn't appear to exist, please check the "
                             "game list to ensure you are entering it correctly.")
